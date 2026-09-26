@@ -46,16 +46,31 @@ def create_access_token(user: User) -> str:
     return jwt.encode(payload, settings.jwt_secret, algorithm=ALGORITHM)
 
 
-def issue_refresh_token(session: Session, user: User) -> str:
+def issue_refresh_token(
+    session: Session,
+    user: User,
+    device_id: str | None = None,
+    user_agent: str | None = None,
+    login_method: str = "pin",
+    started_at: datetime | None = None,
+) -> str:
     token = secrets.token_urlsafe(48)
     session.add(
         RefreshToken(
             user_id=user.id,
             token_hash=_sha256(token),
             expires_at=utcnow() + timedelta(days=get_settings().refresh_token_days),
+            device_id=device_id,
+            user_agent=(user_agent or "")[:200] or None,
+            login_method=login_method,
+            session_started_at=started_at or utcnow(),
         )
     )
     return token
+
+
+def find_refresh_token(session: Session, token: str) -> RefreshToken | None:
+    return session.exec(select(RefreshToken).where(RefreshToken.token_hash == _sha256(token))).first()
 
 
 def rotate_refresh_token(session: Session, token: str) -> User:
@@ -97,8 +112,27 @@ def require_roles(*roles: Role):
     return dependency
 
 
+STEP_UP_PREFIX = "webauthn:"
+
+
+def create_step_up_token(user: User) -> str:
+    """Short-lived proof that the user just confirmed with their device biometric."""
+    now = datetime.now(timezone.utc)
+    payload = {"sub": str(user.id), "typ": "stepup", "iat": now, "exp": now + timedelta(minutes=5)}
+    return STEP_UP_PREFIX + jwt.encode(payload, get_settings().jwt_secret, algorithm=ALGORITHM)
+
+
 def require_pin(user: User, pin: str | None) -> None:
-    """Step-up confirmation for sensitive actions (consent grants, large orders)."""
+    """Step-up confirmation for sensitive actions (consent grants, loans, large orders).
+    Accepts the PIN, or a step-up token from a device-biometric (WebAuthn) check."""
+    if pin and pin.startswith(STEP_UP_PREFIX):
+        try:
+            payload = jwt.decode(pin[len(STEP_UP_PREFIX) :], get_settings().jwt_secret, algorithms=[ALGORITHM])
+            if payload.get("typ") == "stepup" and payload.get("sub") == str(user.id):
+                return
+        except jwt.PyJWTError:
+            pass
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "step_up_required")
     if not pin or not verify_secret(user.pin_hash, pin):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "step_up_required")
 

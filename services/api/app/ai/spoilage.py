@@ -26,6 +26,7 @@ class SpoilageAssessment:
     score: int
     drivers: list[dict[str, str]]
     action: dict[str, str]
+    headline: dict[str, str] = field(default_factory=dict)
     stats: dict[str, Any] = field(default_factory=dict)
     model_version: str = MODEL_VERSION
 
@@ -37,7 +38,9 @@ def assess(
 ) -> SpoilageAssessment:
     """readings: (timestamp, temperature_c, humidity_pct), oldest first, typically the last 24 h."""
     if not readings:
-        return SpoilageAssessment("UNKNOWN", 0, [bi("spoilage.driver.no_data")], bi("spoilage.action.MEDIUM"))
+        return SpoilageAssessment(
+            "UNKNOWN", 0, [bi("spoilage.driver.no_data")], bi("spoilage.action.MEDIUM"), bi("spoilage.headline.UNKNOWN")
+        )
     rh_ideal, rh_unsafe, t_ideal, t_unsafe = LIMITS.get(crop_type, LIMITS["maize"])
     temps = [r[1] for r in readings]
     rhs = [r[2] for r in readings]
@@ -88,6 +91,7 @@ def assess(
         score=score,
         drivers=drivers,
         action=bi(f"spoilage.action.{level}"),
+        headline=bi("spoilage.headline.HIGH_RISING" if level == "HIGH" and rh_trend >= 4 else f"spoilage.headline.{level}"),
         stats={
             "temp_avg": round(temp_avg, 2),
             "temp_max": round(temp_max, 2),

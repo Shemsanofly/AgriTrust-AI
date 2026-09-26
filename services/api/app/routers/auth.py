@@ -2,7 +2,8 @@ import secrets
 from datetime import timedelta
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
@@ -10,11 +11,12 @@ from ..config import get_settings
 from ..db import get_session
 from ..i18n import bi
 from ..integrations.sms import send_sms
-from ..models import Buyer, Farmer, Language, Role, User, utcnow
+from ..models import Buyer, Farmer, Language, RefreshToken, Role, User, WebAuthnCredential, utcnow
 from ..notify import notify
 from ..security.audit import audit
 from ..security.auth import (
     create_access_token,
+    find_refresh_token,
     get_current_user,
     hash_secret,
     issue_refresh_token,
@@ -83,13 +85,37 @@ def user_json(session: Session, user: User) -> dict:
     return data
 
 
-def _tokens(session: Session, user: User) -> dict:
-    refresh = issue_refresh_token(session, user)
+def device_label(user_agent: str | None) -> str:
+    ua = (user_agent or "").lower()
+    os_name = next((n for k, n in (("android", "Android"), ("iphone", "iPhone"), ("ipad", "iPad"), ("windows", "Windows"), ("mac os", "Mac"), ("linux", "Linux")) if k in ua), "")
+    browser = next((n for k, n in (("edg/", "Edge"), ("chrome", "Chrome"), ("firefox", "Firefox"), ("safari", "Safari")) if k in ua), "")
+    return " · ".join(x for x in (browser, os_name) if x) or "Unknown device"
+
+
+def _tokens(session: Session, user: User, request: Request | None = None, method: str = "pin", started_at=None) -> dict:
+    device_id = request.headers.get("x-device-id") if request else None
+    user_agent = request.headers.get("user-agent") if request else None
+    new_device = False
+    if request and method != "refresh":
+        known = session.exec(select(RefreshToken).where(RefreshToken.user_id == user.id)).all()
+        if known and device_id and not any(t.device_id == device_id for t in known):
+            new_device = True
+            notify(
+                session,
+                user,
+                "SECURITY",
+                bi("alert.new_device", device=device_label(user_agent)),
+                severity="WARNING",
+                sms=True,
+            )
+            audit(session, user.id, "NEW_DEVICE_LOGIN", "USER", user.id, reason=device_label(user_agent))
+    refresh = issue_refresh_token(session, user, device_id, user_agent, "pin" if method == "refresh" else method, started_at)
     session.commit()
     return {
         "access_token": create_access_token(user),
         "refresh_token": refresh,
         "token_type": "bearer",
+        "new_device": new_device,
         "user": user_json(session, user),
     }
 
@@ -142,7 +168,7 @@ def register(body: RegisterIn, session: Session = Depends(get_session)):
 
 
 @router.post("/otp/verify")
-def verify_otp(body: OtpIn, session: Session = Depends(get_session)):
+def verify_otp(body: OtpIn, request: Request, session: Session = Depends(get_session)):
     user = session.exec(select(User).where(User.phone == body.phone)).first()
     if (
         not user
@@ -157,11 +183,11 @@ def verify_otp(body: OtpIn, session: Session = Depends(get_session)):
     user.status = "ACTIVE"
     session.add(user)
     audit(session, user.id, "OTP_VERIFIED", "USER", user.id)
-    return _tokens(session, user)
+    return _tokens(session, user, request, "otp")
 
 
 @router.post("/login")
-def login(body: LoginIn, session: Session = Depends(get_session)):
+def login(body: LoginIn, request: Request, session: Session = Depends(get_session)):
     settings = get_settings()
     user = session.exec(select(User).where(User.phone == body.phone)).first()
     if not user:
@@ -184,7 +210,11 @@ def login(body: LoginIn, session: Session = Depends(get_session)):
             audit(session, user.id, "ACCOUNT_LOCKED", "USER", user.id, reason="failed_pin_attempts")
         session.add(user)
         session.commit()
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid_credentials")
+        left = settings.max_failed_logins - user.failed_logins if user.failed_logins else 0
+        if not left:
+            return JSONResponse({"detail": "account_locked"}, status_code=status.HTTP_423_LOCKED)
+        # Tell the person how many tries remain before the temporary lock.
+        return JSONResponse({"detail": "invalid_credentials", "attempts_left": left}, status_code=status.HTTP_401_UNAUTHORIZED)
     if user.status == "PENDING_OTP":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "otp_required")
     if user.status != "ACTIVE":
@@ -192,13 +222,21 @@ def login(body: LoginIn, session: Session = Depends(get_session)):
     user.failed_logins = 0
     session.add(user)
     audit(session, user.id, "LOGIN", "USER", user.id)
-    return _tokens(session, user)
+    return _tokens(session, user, request, "pin")
 
 
 @router.post("/refresh")
-def refresh(body: RefreshIn, session: Session = Depends(get_session)):
+def refresh(body: RefreshIn, request: Request, session: Session = Depends(get_session)):
+    old = find_refresh_token(session, body.refresh_token)
     user = rotate_refresh_token(session, body.refresh_token)
-    return _tokens(session, user)
+    data = _tokens(session, user, None, "refresh", old.session_started_at if old else None)
+    # Keep the session's device and sign-in method across refreshes.
+    new = find_refresh_token(session, data["refresh_token"])
+    if old and new:
+        new.device_id, new.user_agent, new.login_method = old.device_id, old.user_agent, old.login_method
+        session.add(new)
+        session.commit()
+    return data
 
 
 @router.post("/logout", status_code=204)
@@ -226,3 +264,73 @@ def update_me(body: MeUpdate, user: User = Depends(get_current_user), session: S
     session.commit()
     session.refresh(user)
     return user_json(session, user)
+
+
+# ---------------------------------------------------------------- sessions & devices
+
+
+@me_router.get("/me/sessions")
+def my_sessions(request: Request, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    """Active sign-ins, one row per device (refresh-token chains are merged by device)."""
+    now = utcnow()
+    rows = session.exec(
+        select(RefreshToken).where(RefreshToken.user_id == user.id, RefreshToken.revoked_at.is_(None)).order_by(RefreshToken.created_at.desc())  # type: ignore[union-attr]
+    ).all()
+    current_device = request.headers.get("x-device-id")
+    seen: set[str] = set()
+    out = []
+    for r in rows:
+        if r.expires_at < now:
+            continue
+        key = r.device_id or f"token-{r.id}"
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(
+            {
+                "id": r.id,
+                "device": device_label(r.user_agent),
+                "login_method": r.login_method,
+                "started_at": r.session_started_at.isoformat(),
+                "last_active_at": r.created_at.isoformat(),
+                "current": bool(current_device and r.device_id == current_device),
+            }
+        )
+    return out
+
+
+@me_router.delete("/me/sessions/{session_id}", status_code=204)
+def revoke_session(session_id: int, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    target = session.get(RefreshToken, session_id)
+    if not target or target.user_id != user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")
+    for r in session.exec(select(RefreshToken).where(RefreshToken.user_id == user.id, RefreshToken.revoked_at.is_(None))):  # type: ignore[union-attr]
+        if r.id == target.id or (target.device_id and r.device_id == target.device_id):
+            r.revoked_at = utcnow()
+            session.add(r)
+    audit(session, user.id, "REVOKE_SESSION", "USER", user.id, reason=device_label(target.user_agent))
+    session.commit()
+
+
+@me_router.post("/me/sessions/revoke-others", status_code=204)
+def revoke_other_sessions(request: Request, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    current_device = request.headers.get("x-device-id")
+    for r in session.exec(select(RefreshToken).where(RefreshToken.user_id == user.id, RefreshToken.revoked_at.is_(None))):  # type: ignore[union-attr]
+        if not current_device or r.device_id != current_device:
+            r.revoked_at = utcnow()
+            session.add(r)
+    audit(session, user.id, "REVOKE_OTHER_SESSIONS", "USER", user.id)
+    session.commit()
+
+
+@me_router.get("/me/security")
+def my_security(user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    creds = session.exec(select(WebAuthnCredential).where(WebAuthnCredential.user_id == user.id)).all()
+    return {
+        "passkeys": [
+            {"id": c.id, "label": c.label, "created_at": c.created_at.isoformat(), "last_used_at": c.last_used_at.isoformat() if c.last_used_at else None}
+            for c in creds
+        ],
+        "pin_set": True,
+        "phone_verified": user.status == "ACTIVE",
+    }

@@ -29,9 +29,12 @@ MESSAGES: dict[str, dict[str, str]] = {
         "sw": "Mwagilia {when}, takriban mm {mm}",
     },
     "irrigation.headline.skip_rain": {
-        "en": "Don't irrigate: rain is expected",
-        "sw": "Usimwagilie: mvua inatarajiwa",
+        "en": "Soil is getting dry, but about {rain} mm of rain is expected {when}. Delay irrigation.",
+        "sw": "Udongo unakauka, lakini mvua ya takriban mm {rain} inatarajiwa {when}. Subiri kumwagilia.",
     },
+    "irrigation.rain_when.today": {"en": "today", "sw": "leo"},
+    "irrigation.rain_when.tomorrow": {"en": "tomorrow", "sw": "kesho"},
+    "irrigation.rain_when.two_days": {"en": "in the next two days", "sw": "ndani ya siku mbili"},
     "irrigation.headline.no_action": {"en": "Soil moisture is fine", "sw": "Unyevu wa udongo ni mzuri"},
     "irrigation.headline.check_sensor": {
         "en": "No recent sensor data: check the sensor",
@@ -50,8 +53,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "sw": "Mvua ya mm {rain} tu inatarajiwa ndani ya siku 2 zijazo",
     },
     "irrigation.reason.rain_expected": {
-        "en": "{rain} mm of rain forecast in the next 2 days covers most of the {deficit} mm deficit",
-        "sw": "Mvua ya mm {rain} inayotarajiwa ndani ya siku 2 itafidia sehemu kubwa ya upungufu wa mm {deficit}",
+        "en": "{rain} mm of rain is forecast in the next 2 days: most of the ~{mm} mm you would apply",
+        "sw": "Mvua ya mm {rain} inatarajiwa ndani ya siku 2: sehemu kubwa ya mm ~{mm} ambazo ungemwagilia",
     },
     "irrigation.reason.high_et": {
         "en": "Crop water use is high today (ET₀ {et0} mm/day)",
@@ -124,6 +127,26 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "No ghala sensor data yet",
         "sw": "Bado hakuna data ya kihisi cha ghala",
     },
+    "spoilage.headline.HIGH_RISING": {
+        "en": "Humidity is rising. Open the ghala windows today.",
+        "sw": "Unyevu unapanda. Fungua madirisha ya ghala leo.",
+    },
+    "spoilage.headline.HIGH": {
+        "en": "Storage conditions are unsafe. Act today.",
+        "sw": "Hali ya ghala si salama. Chukua hatua leo.",
+    },
+    "spoilage.headline.MEDIUM": {
+        "en": "Conditions are drifting. Check the ghala within 24 hours.",
+        "sw": "Hali inabadilika. Kagua ghala ndani ya saa 24.",
+    },
+    "spoilage.headline.LOW": {
+        "en": "Storage conditions are safe.",
+        "sw": "Hali ya uhifadhi ni salama.",
+    },
+    "spoilage.headline.UNKNOWN": {
+        "en": "No ghala readings yet.",
+        "sw": "Bado hakuna vipimo vya ghala.",
+    },
     "spoilage.action.HIGH": {
         "en": "Ventilate the ghala today, check bags for moisture and mould, and move bags off the floor",
         "sw": "Fungua madirisha ya ghala leo kupitisha hewa, kagua magunia kama yana unyevu au ukungu, na nyanyua magunia kutoka sakafuni",
@@ -184,6 +207,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "sw": "{farmer} ameshiriki wasifu wake nawe kwa ajili ya: {purpose}",
     },
     # --- security
+    "alert.new_device": {
+        "en": "New sign-in to your account from {device}. If this was not you, change your PIN and sign out other devices.",
+        "sw": "Umeingia kwenye akaunti yako kutoka kifaa kipya ({device}). Kama si wewe, badilisha PIN na toa vifaa vingine.",
+    },
     "alert.locked": {
         "en": "Too many wrong PIN attempts. Your account is locked for {minutes} minutes",
         "sw": "Umekosea PIN mara nyingi. Akaunti yako imefungwa kwa dakika {minutes}",
@@ -379,6 +406,29 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "With {method} irrigation you can widen crop choice, but still match crops to soil drainage.",
         "sw": "Kwa umwagiliaji wa {method} unaweza kuchagua mazao mengi zaidi, lakini bado linganisha na mifereji ya udongo.",
     },
+    "planting.ph.acidic": {
+        "en": "Soil pH {ph} is acidic: apply agricultural lime before planting; most crops will struggle.",
+        "sw": "pH ya udongo {ph} ni tindikali: weka chokaa ya kilimo kabla ya kupanda; mazao mengi yatatatizika.",
+    },
+    "planting.ph.slightly_acidic": {
+        "en": "Soil pH {ph} is slightly acidic: well suited to maize, beans and sunflower.",
+        "sw": "pH ya udongo {ph} ina tindikali kidogo: inafaa sana mahindi, maharage na alizeti.",
+    },
+    "planting.ph.neutral": {
+        "en": "Soil pH {ph} is neutral: suitable for most food crops.",
+        "sw": "pH ya udongo {ph} haina tindikali wala alkali: inafaa mazao mengi ya chakula.",
+    },
+    "planting.ph.alkaline": {
+        "en": "Soil pH {ph} is alkaline: sorghum tolerates it best; add organic matter.",
+        "sw": "pH ya udongo {ph} ni alkali: mtama huvumilia vizuri zaidi; ongeza mbolea ya asili.",
+    },
+    "planting.nutrient.low": {
+        "en": "{nutrient} is low: plan a fertiliser top-up (ask your extension officer for the rate).",
+        "sw": "{nutrient} iko chini: panga kuongeza mbolea (muulize afisa ugani kiwango sahihi).",
+    },
+    "nutrient.N": {"en": "Nitrogen", "sw": "Naitrojeni"},
+    "nutrient.P": {"en": "Phosphorus", "sw": "Fosforasi"},
+    "nutrient.K": {"en": "Potassium", "sw": "Potasiamu"},
     "planting.irrigation.drip": {"en": "drip", "sw": "matone"},
     "planting.irrigation.furrow": {"en": "furrow", "sw": "mifereji"},
     "planting.irrigation.sprinkler": {"en": "sprinkler", "sw": "kinyunyizio"},

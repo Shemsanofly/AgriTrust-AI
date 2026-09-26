@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     public_web_url: str = "http://localhost:5173"
 
+    # Passkeys / device biometrics (WebAuthn). RP ID must be the site's host name.
+    webauthn_rp_id: str = "localhost"
+    webauthn_origins: str = "http://localhost:5173,http://localhost:8080,http://localhost:4173"
+
     # Orders above this value (TZS) need PIN step-up confirmation.
     step_up_threshold_tzs: int = 500_000
     max_failed_logins: int = 5
