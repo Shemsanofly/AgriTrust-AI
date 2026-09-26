@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
-from ..ai import irrigation
+from ..ai import irrigation, planting
 from ..db import get_session
 from ..integrations.open_meteo import get_forecast
 from ..models import Crop, Farm, Farmer, IrrigationAdvice, Role, Sensor, SensorReading, User, utcnow
@@ -240,6 +240,25 @@ def irrigation_advice(farm_id: int, user: User = Depends(get_current_user), sess
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no_active_crop")
     session.refresh(advice)
     return advice_json(advice)
+
+
+@router.get("/farms/{farm_id}/planting-advice")
+def planting_advice(farm_id: int, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    """Recommend crops to plant based on the farm's registered soil type."""
+    farm = load_farm(session, farm_id, user)
+    current = session.exec(
+        select(Crop).where(Crop.farm_id == farm.id, Crop.growth_stage != "harvested").order_by(Crop.planting_date.desc())  # type: ignore[attr-defined]
+    ).first()
+    result = planting.recommend(farm.soil_type, current.crop_type if current else None, farm.irrigation_type)
+    return {
+        "headline": result.headline,
+        "soil_summary": result.soil_summary,
+        "tips": result.tips,
+        "recommendations": result.recommendations,
+        "current_crop": result.current_crop,
+        "inputs": result.inputs,
+        "model_version": result.model_version,
+    }
 
 
 @router.get("/farms/{farm_id}/advice-history")

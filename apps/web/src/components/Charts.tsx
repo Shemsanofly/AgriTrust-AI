@@ -1,9 +1,20 @@
-import { CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { CartesianGrid, Legend, Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useFormat } from '../lib/hooks'
 
 export type SeriesDef = { key: string; label: string; color: string; unit: string; limit?: number }
 
-export function TimeSeriesChart({ data, series, height = 220 }: { data: Record<string, any>[]; series: SeriesDef[]; height?: number }) {
+/** `band` shades a target range (e.g. ideal soil moisture) behind the lines. */
+export function TimeSeriesChart({
+  data,
+  series,
+  height = 220,
+  band,
+}: {
+  data: Record<string, any>[]
+  series: SeriesDef[]
+  height?: number
+  band?: { from: number; to: number; color: string }
+}) {
   const f = useFormat()
   return (
     <div style={{ width: '100%', height }}>
@@ -13,7 +24,8 @@ export function TimeSeriesChart({ data, series, height = 220 }: { data: Record<s
           <XAxis dataKey="ts" tickFormatter={f.time} minTickGap={40} tick={{ fontSize: 11 }} />
           <YAxis tick={{ fontSize: 11 }} domain={['auto', 'auto']} />
           <Tooltip labelFormatter={(v) => f.dateTime(String(v))} formatter={(v, name) => [`${v}`, name]} />
-          <Legend wrapperStyle={{ fontSize: 12 }} />
+          {series.length > 1 && <Legend wrapperStyle={{ fontSize: 12 }} />}
+          {band && <ReferenceArea y1={band.from} y2={band.to} fill={band.color} fillOpacity={0.12} stroke="none" />}
           {series.map((s) =>
             s.limit != null ? <ReferenceLine key={`${s.key}-limit`} y={s.limit} stroke={s.color} strokeDasharray="4 4" strokeOpacity={0.6} /> : null,
           )}

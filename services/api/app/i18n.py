@@ -290,6 +290,98 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "Quantity mismatch on {batch}: receipt {receipt_qty} kg vs batch {batch_qty} kg",
         "sw": "Kiasi hakilingani kwa {batch}: stakabadhi kg {receipt_qty} dhidi ya kundi kg {batch_qty}",
     },
+    # --- planting advice (soil → crop)
+    "planting.soil.loam": {"en": "loam", "sw": "tifutifu"},
+    "planting.soil.sandy loam": {"en": "sandy loam", "sw": "tifutifu yenye mchanga"},
+    "planting.soil.sandy": {"en": "sandy soil", "sw": "udongo wa mchanga"},
+    "planting.soil.clay": {"en": "clay", "sw": "mfinyanzi"},
+    "planting.fit.excellent": {"en": "Excellent", "sw": "Bora sana"},
+    "planting.fit.good": {"en": "Good", "sw": "Nzuri"},
+    "planting.fit.fair": {"en": "Fair", "sw": "Wastani"},
+    "planting.fit.poor": {"en": "Poor", "sw": "Dhaifu"},
+    "planting.headline": {
+        "en": "On {soil} soil, prioritise {crops}",
+        "sw": "Kwenye udongo wa {soil}, weka kipaumbele kwa {crops}",
+    },
+    "planting.summary.loam": {
+        "en": "Loam holds nutrients and moisture well — suitable for most food crops.",
+        "sw": "Udongo wa tifutifu huhifadhi virutubisho na unyevu vizuri — unafaa mazao mengi ya chakula.",
+    },
+    "planting.summary.sandy loam": {
+        "en": "Sandy loam drains quickly and warms early — good for deep-rooted and drought-tolerant crops.",
+        "sw": "Tifutifu yenye mchanga hutoa maji haraka na hupata joto mapema — inafaa mazao yenye mizizi mirefu na yanayostahimili ukame.",
+    },
+    "planting.summary.sandy": {
+        "en": "Sandy soil drains fast and holds few nutrients — favour hardy crops and add organic matter.",
+        "sw": "Udongo wa mchanga hutoa maji haraka na huhifadhi virutubisho vichache — chagua mazao thabiti na ongeza mbolea ya asili.",
+    },
+    "planting.summary.clay": {
+        "en": "Clay holds water and nutrients but can be heavy — strong for rice and many cereals if managed well.",
+        "sw": "Mfinyanzi hushikilia maji na virutubisho lakini unaweza kuwa mzito — unafaa mchele na nafaka nyingi ukisimamiwa vizuri.",
+    },
+    "planting.reason.excellent": {
+        "en": "{crop} thrives on {soil} soil with typical smallholder practices.",
+        "sw": "{crop} hukua vizuri sana kwenye udongo wa {soil} kwa mbinu za kawaida za mkulima mdogo.",
+    },
+    "planting.reason.good": {
+        "en": "{crop} performs well on {soil} soil when planting and fertility are managed carefully.",
+        "sw": "{crop} hufanya vizuri kwenye udongo wa {soil} ukipanda na kutunza rutuba kwa uangalifu.",
+    },
+    "planting.reason.fair": {
+        "en": "{crop} can grow on {soil} soil but may need extra water, manure or drainage.",
+        "sw": "{crop} linaweza kukua kwenye udongo wa {soil} lakini linaweza kuhitaji maji, mbolea au mifereji ya ziada.",
+    },
+    "planting.reason.poor": {
+        "en": "{crop} is a poor match for {soil} soil — choose a better-suited crop if you can.",
+        "sw": "{crop} halifai sana kwa udongo wa {soil} — chagua zao linalofaa zaidi ikiwezekana.",
+    },
+    "planting.current.excellent": {
+        "en": "Your current {crop} is an excellent match for this {soil} soil.",
+        "sw": "Zao lako la sasa ({crop}) linafaa sana kwa udongo huu wa {soil}.",
+    },
+    "planting.current.good": {
+        "en": "Your current {crop} is a good match for this {soil} soil.",
+        "sw": "Zao lako la sasa ({crop}) linafaa kwa udongo huu wa {soil}.",
+    },
+    "planting.current.fair": {
+        "en": "Your current {crop} is only a fair match for {soil} soil — watch water and fertility closely.",
+        "sw": "Zao lako la sasa ({crop}) linafaa kwa wastani tu kwa udongo wa {soil} — fuatilia maji na rutuba kwa karibu.",
+    },
+    "planting.current.poor": {
+        "en": "Your current {crop} is a poor match for {soil} soil — consider a better-suited crop next season.",
+        "sw": "Zao lako la sasa ({crop}) halifai sana kwa udongo wa {soil} — fikiria zao linalofaa zaidi msimu ujao.",
+    },
+    "planting.tip.loam": {
+        "en": "Keep organic matter high with compost or manure so loam stays crumbly and fertile.",
+        "sw": "Dumisha mbolea ya asili (compost au samadi) ili tifutifu ibaki laini na yenye rutuba.",
+    },
+    "planting.tip.sandy loam": {
+        "en": "Mulch after planting to slow moisture loss on sandy loam.",
+        "sw": "Funika udongo baada ya kupanda ili kupunguza upotevu wa unyevu kwenye tifutifu yenye mchanga.",
+    },
+    "planting.tip.sandy": {
+        "en": "Add manure or compost each season; sandy soils need frequent light fertility inputs.",
+        "sw": "Ongeza samadi au compost kila msimu; udongo wa mchanga unahitaji rutuba mara kwa mara.",
+    },
+    "planting.tip.clay": {
+        "en": "Avoid working clay when it is wet; raise beds or ridges to improve drainage for upland crops.",
+        "sw": "Usilime mfinyanzi ukiwa na maji mengi; tumia matuta kuboresha mifereji kwa mazao yasiyo ya maji.",
+    },
+    "planting.tip.general": {
+        "en": "Match planting date to the local rains and use certified seed where possible.",
+        "sw": "Linganisha tarehe ya kupanda na mvua za eneo lako na tumia mbegu bora inapowezekana.",
+    },
+    "planting.tip.rainfed": {
+        "en": "You are rain-fed: prefer drought-tolerant crops and plant with the onset of reliable rains.",
+        "sw": "Unategemea mvua: chagua mazao yanayostahimili ukame na panda mvua za kuaminika zinapoanza.",
+    },
+    "planting.tip.irrigated": {
+        "en": "With {method} irrigation you can widen crop choice, but still match crops to soil drainage.",
+        "sw": "Kwa umwagiliaji wa {method} unaweza kuchagua mazao mengi zaidi, lakini bado linganisha na mifereji ya udongo.",
+    },
+    "planting.irrigation.drip": {"en": "drip", "sw": "matone"},
+    "planting.irrigation.furrow": {"en": "furrow", "sw": "mifereji"},
+    "planting.irrigation.sprinkler": {"en": "sprinkler", "sw": "kinyunyizio"},
 }
 
 
