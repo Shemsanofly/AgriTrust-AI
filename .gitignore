@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.db
+# Node
+node_modules/
+dist/
+dev-dist/
+# Foundry
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+contracts/lib/
+# Env / secrets
+.env
+*.local
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+iot/firmware/**/secrets.h
