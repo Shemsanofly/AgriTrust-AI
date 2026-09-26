@@ -2,6 +2,7 @@
 // uses a static translation key that is missing.
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const load = (lang) => JSON.parse(readFileSync(new URL(`../src/i18n/${lang}.json`, import.meta.url)))
 const flatten = (obj, prefix = '') =>
@@ -19,7 +20,7 @@ for (const [key, text] of en) {
 for (const key of sw.keys()) if (!en.has(key)) problems.push(`missing in en: ${key}`)
 
 const walk = (dir) => readdirSync(dir).flatMap((f) => (statSync(join(dir, f)).isDirectory() ? walk(join(dir, f)) : [join(dir, f)]))
-const src = new URL('../src', import.meta.url).pathname
+const src = fileURLToPath(new URL('../src', import.meta.url))
 for (const file of walk(src).filter((f) => /\.tsx?$/.test(f))) {
   const code = readFileSync(file, 'utf8')
   for (const m of code.matchAll(/\bt\('([a-zA-Z0-9_.]+)'/g)) if (!has(en, m[1])) problems.push(`unknown key ${m[1]} in ${file}`)

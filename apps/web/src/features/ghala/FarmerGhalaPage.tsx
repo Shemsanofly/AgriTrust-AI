@@ -120,7 +120,9 @@ function HarvestDialog({ open, crops, onClose, onCreated }: { open: boolean; cro
   const f = useFormat()
   const errorText = useErrorText()
   const { data: warehouses } = useApi<{ id: number; name: string; region: string; verified: boolean }[]>(open ? '/warehouses' : null)
+  const verifiedWarehouses = warehouses?.filter((w) => w.verified) ?? []
   const [cropId, setCropId] = useState('')
+  const [warehouseId, setWarehouseId] = useState('')
   const [qty, setQty] = useState('')
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [busy, setBusy] = useState(false)
@@ -135,16 +137,21 @@ function HarvestDialog({ open, crops, onClose, onCreated }: { open: boolean; cro
     }
   }, [open])
 
+  useEffect(() => {
+    if (!warehouseId && verifiedWarehouses.length) setWarehouseId(String(verifiedWarehouses[0].id))
+  }, [verifiedWarehouses, warehouseId])
+
   const qtyNum = Number(qty.replace(',', '.'))
   const qtyError = qty && !(qtyNum > 0) ? t('validation.quantity') : null
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     if (!(qtyNum > 0)) return setError(t('validation.quantity'))
+    if (!warehouseId) return setError(t('validation.required'))
     setBusy(true)
     setError(null)
     try {
-      const batch = await api<Batch>('/harvests', { method: 'POST', body: { crop_id: Number(cropId || crops[0].id), quantity_kg: qtyNum, harvest_date: date } })
+      const batch = await api<Batch>('/harvests', { method: 'POST', body: { crop_id: Number(cropId || crops[0].id), quantity_kg: qtyNum, harvest_date: date, warehouse_id: Number(warehouseId) } })
       setCreated(batch)
       onCreated()
     } catch (err) {
@@ -171,17 +178,17 @@ function HarvestDialog({ open, crops, onClose, onCreated }: { open: boolean; cro
           )}
         </div>
         <div className="mt-5 rounded-md bg-sunken p-4 text-sm">
-          <p className="font-semibold">{t('ghala.nextTakeToGhala')}</p>
-          <p className="mt-1 text-muted">{t('ghala.nextTakeToGhalaBody')}</p>
+          <p className="font-semibold">{t('ghala.storedAfterHarvestTitle')}</p>
+          <p className="mt-1 text-muted">{t('ghala.storedAfterHarvestBody')}</p>
           <ul className="mt-3 space-y-1.5">
-            {warehouses
-              ?.filter((w) => w.verified)
+            {(created.warehouse ? [created.warehouse] : [])
               .map((w) => (
                 <li key={w.id} className="flex items-center gap-2">
                   <Warehouse className="size-4 text-muted" aria-hidden /> {w.name} · <span className="text-muted">{w.region}</span>
                 </li>
               ))}
           </ul>
+          {created.receipt && <p className="num mt-2 text-xs text-muted">{created.receipt.id}</p>}
         </div>
         <div className="mt-4 flex gap-2">
           <Button variant="secondary" className="flex-1" onClick={() => window.print()}>
@@ -206,7 +213,7 @@ function HarvestDialog({ open, crops, onClose, onCreated }: { open: boolean; cro
             <Button variant="secondary" onClick={onClose}>
               {t('common.cancel')}
             </Button>
-            <Button type="submit" form="harvest-form" busy={busy} disabled={!qty}>
+            <Button type="submit" form="harvest-form" busy={busy} disabled={!qty || !warehouseId}>
               {t('ghala.createBatch')}
             </Button>
           </>
@@ -234,6 +241,15 @@ function HarvestDialog({ open, crops, onClose, onCreated }: { open: boolean; cro
               <input className="input" type="date" value={date} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setDate(e.target.value)} />
             </Field>
           </div>
+          <Field label={t('ghala.destinationGhala')}>
+            <select className="input" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
+              {verifiedWarehouses.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name} Â· {w.region}
+                </option>
+              ))}
+            </select>
+          </Field>
           <p className="text-[13px] text-muted">{t('ghala.batchHint')}</p>
           <ErrorNote text={error} />
         </form>

@@ -1,5 +1,4 @@
 import { ArrowRight, CalendarClock, Check, CloudRain, Droplets, FlaskRound, MapPin, Thermometer, Warehouse, type LucideIcon } from 'lucide-react'
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { AlertsPanel } from '../../components/AlertsPanel'
@@ -7,7 +6,6 @@ import { cropIcon } from '../../components/crops'
 import { Badge, Card, EmptyState, ErrorState, Loading, ProgressBar, RiskBadge, Stat, StatStrip, cx } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
 import { useApi, useBi, useErrorText, useFormat } from '../../lib/hooks'
-import { IrrigationCard } from './IrrigationCard'
 import { daysUntil, moistureState, seasonProgress, type Batch, type Farm, type Weather } from './shared'
 
 type Order = { id: number; status: string; batch_id: string; quantity_kg: number; total: number; updated_at: string; buyer: { business_name: string } }
@@ -22,12 +20,11 @@ export function FarmerHome() {
   const f = useFormat()
   const errorText = useErrorText()
   const { user } = useAuth()
-  const [tick, setTick] = useState(0)
-  const { data: farms, loading, error, reload } = useApi<Farm[]>('/farms', [tick])
-  const { data: batches } = useApi<Batch[]>('/batches', [tick])
-  const { data: orders } = useApi<Order[]>('/orders', [tick])
+  const { data: farms, loading, error, reload } = useApi<Farm[]>('/farms')
+  const { data: batches } = useApi<Batch[]>('/batches')
+  const { data: orders } = useApi<Order[]>('/orders')
   const farm = farms?.find((x) => x.sensors.some((s) => s.type === 'soil')) ?? farms?.[0]
-  const { data: weather } = useApi<Weather>(farm ? `/farms/${farm.id}/weather` : null, [tick])
+  const { data: weather } = useApi<Weather>(farm ? `/farms/${farm.id}/weather` : null)
 
   if (loading && !farms) return <Loading rows={4} />
   if (error) return <ErrorState text={errorText(error)} onRetry={reload} />
@@ -49,6 +46,9 @@ export function FarmerHome() {
   const moisture = farm.latest.soil_moisture_pct
   const soilTemp = farm.latest.soil_temperature_c
   const state = moistureState(moisture?.value)
+  const moistureSub = state ? `${moisture?.quality_flag === 'ESTIMATE' ? `${t('farm.aiEstimate')} - ` : ''}${t(`farm.moisture.${state}`)}` : t('farm.noReadings')
+  const tempSub = soilTemp ? (soilTemp.quality_flag === 'ESTIMATE' ? t('farm.aiEstimate') : f.relative(soilTemp.ts)) : t('farm.noReadings')
+  const phSub = farm.soil_ph != null ? `${farm.soil_source === 'soil_map' ? `${t('farm.aiEstimate')} - ` : ''}${t(`soilPh.${phBand(farm.soil_ph)}`)}` : t('farm.noSoilTest')
   const rain2 = weather ? weather.days.slice(0, 2).reduce((s, d) => s + d.rain_mm, 0) : null
   const today = weather?.days[0]
 
@@ -73,22 +73,20 @@ export function FarmerHome() {
 
       <div className="grid gap-5 lg:grid-cols-[1.35fr_1fr]">
         <div className="space-y-5">
-          <IrrigationCard farmId={farm.id} refreshKey={tick} onChanged={() => setTick((x) => x + 1)} />
-
           <StatStrip>
             <Stat
               icon={Droplets}
               label={t('farm.soilMoisture')}
               value={moisture ? `${f.num(moisture.value, 1)}%` : '—'}
-              sub={state ? t(`farm.moisture.${state}`) : t('farm.noReadings')}
+              sub={moistureSub}
               tone={state === 'dry' ? 'amber' : undefined}
             />
-            <Stat icon={Thermometer} label={t('farm.soilTemp')} value={soilTemp ? `${f.num(soilTemp.value, 1)}°C` : '—'} sub={moisture ? f.relative(moisture.ts) : undefined} />
+            <Stat icon={Thermometer} label={t('farm.soilTemp')} value={soilTemp ? `${f.num(soilTemp.value, 1)}°C` : '—'} sub={tempSub} />
             <Stat
               icon={FlaskRound}
               label={t('farm.soilPh')}
               value={farm.soil_ph != null ? f.num(farm.soil_ph, 1) : '—'}
-              sub={farm.soil_ph != null ? t(`soilPh.${phBand(farm.soil_ph)}`) : t('farm.noSoilTest')}
+              sub={phSub}
             />
             <Stat icon={CloudRain} label={t('farm.rainNext2Days')} value={rain2 != null ? `${f.num(rain2, 1)} mm` : '—'} sub={weather?.simulated ? t('common.simulated') : 'Open-Meteo'} />
           </StatStrip>
@@ -97,7 +95,7 @@ export function FarmerHome() {
         </div>
 
         <div className="space-y-5">
-          <AlertsPanel refreshKey={tick} limit={3} title={t('home.needsAttention')} />
+          <AlertsPanel limit={3} title={t('home.needsAttention')} />
           <GhalaSnapshot batches={batches ?? []} />
           <RecentActivity batches={batches ?? []} orders={orders ?? []} />
         </div>

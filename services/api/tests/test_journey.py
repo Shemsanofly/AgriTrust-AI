@@ -14,32 +14,30 @@ def test_full_demo_journey(client, login):
 
     # --- Shambani: soil dries out -> irrigation advice in Kiswahili + English
     farms = client.get("/farms", headers=farmer).json()
-    upper = next(f for f in farms if f["name"] == "Shamba la Juu")
+    farm = next(f for f in farms if f["name"] == "Shamba")
     assert client.post("/demo/scenario/soil-drying", headers=farmer).status_code == 200
-    advice = client.get(f"/farms/{upper['id']}/irrigation-advice", headers=farmer).json()
+    advice = client.get(f"/farms/{farm['id']}/irrigation-advice", headers=farmer).json()
     assert advice["action"] == "IRRIGATE"
     assert advice["headline"]["sw"].startswith("Mwagilia")
     assert advice["headline"]["en"].startswith("Irrigate")
     assert advice["reasons"] and all({"en", "sw"} <= set(r) for r in advice["reasons"])
     assert client.post(f"/advice/{advice['id']}/feedback", json={"followed": True}, headers=farmer).status_code == 200
 
-    # --- Harvest -> batch + on-chain (simulated) proof
-    lower = next(f for f in farms if f["name"] == "Shamba la Chini")
-    crop = next(c for c in lower["crops"] if c["growth_stage"] == "maturity")
+    # --- Harvest -> batch + on-chain (simulated) proof, stored straight into the ghala
+    crop = next(c for c in farm["crops"] if c["growth_stage"] == "maturity")
+    warehouse_id = client.get("/me", headers=wh).json()["warehouses"][0]["id"]
     batch = client.post(
-        "/harvests", json={"crop_id": crop["id"], "harvest_date": date.today().isoformat(), "quantity_kg": 2600}, headers=farmer
+        "/harvests",
+        json={"crop_id": crop["id"], "harvest_date": date.today().isoformat(), "quantity_kg": 2600, "warehouse_id": warehouse_id, "bay": "A-1"},
+        headers=farmer,
     ).json()
     batch_id = batch["id"]
     assert batch_id.startswith("BATCH-") and batch["proofs"][0]["mode"] == "SIMULATED"
-    # Can't list before the ghala issues a receipt.
-    assert client.patch(f"/batches/{batch_id}/listing", json={"listed": True, "price_per_kg": 800}, headers=farmer).status_code == 409
 
-    # --- Ghalani: intake -> digital warehouse receipt
-    warehouse_id = client.get("/me", headers=wh).json()["warehouses"][0]["id"]
-    assert any(b["id"] == batch_id for b in client.get("/warehouses/pending-batches", headers=wh).json())
-    receipt = client.post(
-        f"/warehouses/{warehouse_id}/intake", json={"batch_id": batch_id, "quantity_kg": 2500, "grade": "A", "bay": "A-1"}, headers=wh
-    ).json()
+    # --- Ghalani: digital warehouse receipt issued on intake
+    assert batch["status"] == "IN_STORAGE" and batch["warehouse"]["id"] == warehouse_id
+    assert not any(b["id"] == batch_id for b in client.get("/warehouses/pending-batches", headers=wh).json())
+    receipt = client.get(f"/receipts/{batch['receipt']['id']}", headers=farmer).json()
     assert receipt["id"].startswith("WR-") and receipt["status"] == "ACTIVE"
     assert receipt["legal_notice"]["sw"]
 
