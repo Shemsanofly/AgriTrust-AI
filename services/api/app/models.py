@@ -53,7 +53,26 @@ class RefreshToken(SQLModel, table=True):
     token_hash: str = Field(index=True)
     expires_at: datetime
     revoked_at: Optional[datetime] = None
+    # Session / device recognition (a random id the app keeps on the device).
+    device_id: Optional[str] = None
+    user_agent: Optional[str] = None
+    login_method: str = "pin"  # pin | otp | biometric
+    session_started_at: datetime = Field(default_factory=utcnow)
     created_at: datetime = Field(default_factory=utcnow)
+
+
+class WebAuthnCredential(SQLModel, table=True):
+    """A passkey / device biometric. Only the public key is stored: the fingerprint or
+    face never leaves the device and nothing biometric is ever put on chain."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    credential_id: str = Field(index=True, unique=True)  # base64url
+    public_key: str  # base64url COSE key
+    sign_count: int = 0
+    label: str = ""
+    created_at: datetime = Field(default_factory=utcnow)
+    last_used_at: Optional[datetime] = None
 
 
 class Farmer(SQLModel, table=True):
@@ -100,6 +119,13 @@ class Farm(SQLModel, table=True):
     acreage: float
     soil_type: str = "loam"
     irrigation_type: str = "drip"
+    # Soil profile (optional): from a lab test, the TARI soil map or the farmer.
+    soil_ph: Optional[float] = None
+    soil_nitrogen: Optional[str] = None  # low | medium | high
+    soil_phosphorus: Optional[str] = None
+    soil_potassium: Optional[str] = None
+    organic_matter_pct: Optional[float] = None
+    soil_source: Optional[str] = None  # lab | soil_map | farmer
     created_at: datetime = Field(default_factory=utcnow)
 
 

@@ -42,6 +42,15 @@ class Advice:
     model_version: str = MODEL_VERSION
 
 
+def _rain_when(forecast: Forecast) -> str:
+    days = forecast.days[:2]
+    if days and days[0].rain_mm >= 2:
+        return "today"
+    if len(days) > 1 and days[1].rain_mm >= 2:
+        return "tomorrow"
+    return "two_days"
+
+
 def recommend(
     crop_type: str,
     stage: str,
@@ -103,13 +112,16 @@ def recommend(
         )
     ]
     effective_rain = rain48 * 0.8
-    if effective_rain >= deficit * 0.5:
-        reasons.append(bi("irrigation.reason.rain_expected", rain=rain48, deficit=deficit))
+    # Compare expected rain with the next single application (not the whole root-zone
+    # deficit): if rain will deliver most of what we would apply, wait for it.
+    planned = min(MAX_APPLICATION_MM, deficit)
+    if effective_rain >= planned * 0.6:
+        reasons.append(bi("irrigation.reason.rain_expected", rain=rain48, mm=round(planned)))
         return Advice(
             action="SKIP_RAIN",
             amount_mm=0,
             when=bi("irrigation.when.none"),
-            headline=bi("irrigation.headline.skip_rain"),
+            headline=bi("irrigation.headline.skip_rain", rain=rain48, when=bi(f"irrigation.rain_when.{_rain_when(forecast)}")),
             reasons=reasons + extra,
             inputs=inputs,
         )

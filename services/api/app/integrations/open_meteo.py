@@ -14,6 +14,8 @@ from ..config import get_settings
 
 log = logging.getLogger(__name__)
 _cache: dict[str, tuple[float, "Forecast"]] = {}
+# Demo only (DEV_MODE): force a rainy forecast so "delay irrigation" can be shown live.
+DEMO_OVERRIDE: dict[str, str | None] = {"weather": None}
 _CACHE_SECONDS = 1800
 
 
@@ -49,7 +51,11 @@ def _simulated(lat: float, lon: float, start: date, n_days: int, dry: bool = Tru
 def get_forecast(lat: float, lon: float, n_days: int = 7) -> Forecast:
     settings = get_settings()
     today = date.today()
-    if settings.weather_mode != "live":
+    if DEMO_OVERRIDE["weather"] == "rain":
+        fc = _simulated(lat, lon, today, n_days, dry=False)
+        fc.days[0].rain_mm, fc.days[1].rain_mm = 14.0, 10.0
+        return fc
+    if settings.weather_mode != "live" or DEMO_OVERRIDE["weather"] == "dry":
         return _simulated(lat, lon, today, n_days)
     key = f"{lat:.2f},{lon:.2f},{n_days}"
     cached = _cache.get(key)

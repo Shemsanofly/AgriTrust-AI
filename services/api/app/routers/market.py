@@ -1,5 +1,5 @@
 import secrets
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -69,6 +69,7 @@ def listing_json(session: Session, batch: CropBatch, detail: bool = False) -> di
     wh = session.get(Warehouse, batch.warehouse_id) if batch.warehouse_id else None
     risk = batch_risk(session, batch)
     verification = verification_summary(session, batch)
+    receipt = session.exec(select(WarehouseReceipt).where(WarehouseReceipt.batch_id == batch.id)).first()
     data = {
         "batch_id": batch.id,
         "crop_type": batch.crop_type,
@@ -78,9 +79,20 @@ def listing_json(session: Session, batch: CropBatch, detail: bool = False) -> di
         "currency": batch.currency,
         "harvest_date": batch.harvest_date.isoformat(),
         # No personal contact details until an order is accepted.
-        "farmer": {"public_id": farmer.public_id, "display_name": farmer.display_name, "region": farmer.region} if farmer else None,
+        "farmer": {
+            "public_id": farmer.public_id,
+            "display_name": farmer.display_name,
+            "region": farmer.region,
+            "district": farmer.district,
+            "cooperative": farmer.cooperative,
+        }
+        if farmer
+        else None,
         "warehouse": {"public_id": wh.public_id, "name": wh.name, "region": wh.region, "lat": wh.lat, "lon": wh.lon} if wh else None,
-        "risk": {"level": risk.level, "drivers": risk.drivers},
+        "receipt_id": receipt.id if receipt else None,
+        "date_in": receipt.date_in.isoformat() if receipt else None,
+        "days_in_storage": (date.today() - receipt.date_in).days if receipt else None,
+        "risk": {"level": risk.level, "headline": risk.headline, "drivers": risk.drivers, "stats": risk.stats},
         "verification_status": verification["status"],
         "qr_url": f"{get_settings().public_web_url}/verify/{batch.id}",
     }

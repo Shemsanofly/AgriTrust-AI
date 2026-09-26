@@ -105,3 +105,16 @@ def restore(batch_id: str, user: User = Depends(require_roles(Role.ADMIN)), sess
     audit(session, user.id, "DEMO_RESTORE", "BATCH", batch.id)
     session.commit()
     return {"batch_id": batch.id, "quantity_kg": batch.quantity_kg}
+
+
+@router.post("/weather/{mode}")
+def demo_weather(mode: str, user: User = Depends(get_current_user)):
+    """Demo: 'rain' forces a rainy forecast, 'dry' a dry one, 'live' returns to normal."""
+    _require_dev()
+    from ..integrations import open_meteo
+
+    if mode not in ("rain", "dry", "live"):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "unknown_scenario")
+    open_meteo.DEMO_OVERRIDE["weather"] = None if mode == "live" else mode
+    open_meteo._cache.clear()
+    return {"weather": mode, "simulated": mode != "live"}

@@ -57,6 +57,31 @@ class PlantingAdvice:
     model_version: str = MODEL_VERSION
 
 
+def ph_band(ph: float) -> str:
+    if ph < 5.5:
+        return "acidic"
+    if ph < 6.6:
+        return "slightly_acidic"
+    if ph <= 7.3:
+        return "neutral"
+    return "alkaline"
+
+
+def soil_profile_notes(ph: float | None, nutrients: dict[str, str | None]) -> dict[str, Any]:
+    """pH band and nutrient notes (rules). Empty when no soil test is recorded."""
+    notes = []
+    for key, level in nutrients.items():
+        if level == "low":
+            notes.append(bi("planting.nutrient.low", nutrient=bi(f"nutrient.{key}")))
+    return {
+        "ph": ph,
+        "ph_band": ph_band(ph) if ph is not None else None,
+        "ph_note": bi(f"planting.ph.{ph_band(ph)}", ph=ph) if ph is not None else None,
+        "nutrients": nutrients,
+        "nutrient_notes": notes,
+    }
+
+
 def recommend(soil_type: str, current_crop_type: str | None = None, irrigation_type: str | None = None) -> PlantingAdvice:
     soil_key = soil_type if soil_type in SOIL_CROP_FIT else "loam"
     soil_label = bi(f"planting.soil.{soil_key}")

@@ -32,6 +32,12 @@ class FarmIn(BaseModel):
     acreage: float = Field(gt=0, le=10_000)
     soil_type: str = "loam"
     irrigation_type: str = "drip"
+    soil_ph: Optional[float] = Field(default=None, ge=3, le=10)
+    soil_nitrogen: Optional[str] = Field(default=None, pattern=r"^(low|medium|high)$")
+    soil_phosphorus: Optional[str] = Field(default=None, pattern=r"^(low|medium|high)$")
+    soil_potassium: Optional[str] = Field(default=None, pattern=r"^(low|medium|high)$")
+    organic_matter_pct: Optional[float] = Field(default=None, ge=0, le=20)
+    soil_source: Optional[str] = Field(default=None, pattern=r"^(lab|soil_map|farmer)$")
     crop: Optional[CropIn] = None
 
 
@@ -256,6 +262,14 @@ def planting_advice(farm_id: int, user: User = Depends(get_current_user), sessio
         "tips": result.tips,
         "recommendations": result.recommendations,
         "current_crop": result.current_crop,
+        "soil_profile": {
+            **planting.soil_profile_notes(
+                farm.soil_ph,
+                {"N": farm.soil_nitrogen, "P": farm.soil_phosphorus, "K": farm.soil_potassium},
+            ),
+            "organic_matter_pct": farm.organic_matter_pct,
+            "source": farm.soil_source,
+        },
         "inputs": result.inputs,
         "model_version": result.model_version,
     }

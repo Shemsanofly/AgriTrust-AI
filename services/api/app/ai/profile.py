@@ -196,8 +196,76 @@ def build_profile(session: Session, farmer: Farmer) -> FarmerRiskProfile:
     return profile
 
 
-def profile_json(p: FarmerRiskProfile, farmer: Farmer) -> dict[str, Any]:
+def profile_evidence(session: Session, farmer: Farmer) -> dict[str, Any]:
+    """The verified records behind the scorecard, so a person can check every factor."""
+    from ..models import Buyer, StorageRecord
+
+    batches = list(session.exec(select(CropBatch).where(CropBatch.farmer_id == farmer.id)))
+    by_harvest = {b.harvest_id: b for b in batches}
+    harvests = (
+        list(session.exec(select(Harvest).where(Harvest.id.in_(list(by_harvest))).order_by(Harvest.harvest_date)))  # type: ignore[union-attr, arg-type]
+        if by_harvest
+        else []
+    )
+    receipts = list(session.exec(select(WarehouseReceipt).where(WarehouseReceipt.owner_farmer_id == farmer.id)))
+    windows = (
+        list(session.exec(select(StorageRecord).where(StorageRecord.batch_id.in_([b.id for b in batches]))))  # type: ignore[attr-defined]
+        if batches
+        else []
+    )
+    sales = list(
+        session.exec(
+            select(Sale).where(Sale.farmer_id == farmer.id, Sale.completed_at.is_not(None)).order_by(Sale.completed_at)  # type: ignore[union-attr, arg-type]
+        )
+    )
+    buyer_names = {b.id: b.business_name for b in session.exec(select(Buyer))}
+    buyer_counts: dict[int, int] = {}
+    for sale in sales:
+        buyer_counts[sale.buyer_id] = buyer_counts.get(sale.buyer_id, 0) + 1
+    drought = farmer.region.strip().lower() in DROUGHT_PRONE_REGIONS
+    safe_windows = sum(1 for w in windows if w.risk_level == "LOW")
     return {
+        "production": {
+            "harvests": [
+                {"date": h.harvest_date.isoformat(), "crop_type": by_harvest[h.id].crop_type, "quantity_kg": h.quantity_kg, "batch_id": by_harvest[h.id].id}
+                for h in harvests
+            ],
+            "total_kg": round(sum(h.quantity_kg for h in harvests)),
+        },
+        "storage": {
+            "receipts": [
+                {"id": r.id, "quantity_kg": r.quantity_kg, "grade": r.grade, "date_in": r.date_in.isoformat(), "status": r.status} for r in receipts
+            ],
+            "windows": len(windows),
+            "safe_windows": safe_windows,
+            "avg_humidity_pct": round(sum(w.rh_avg for w in windows) / len(windows), 1) if windows else None,
+        },
+        "sales": {
+            "items": [
+                {
+                    "id": sale.id,
+                    "date": sale.completed_at.isoformat() if sale.completed_at else None,
+                    "quantity_kg": sale.quantity_kg,
+                    "amount": sale.amount,
+                    "buyer": buyer_names.get(sale.buyer_id),
+                }
+                for sale in sales
+            ],
+            "total_tzs": round(sum(sale.amount for sale in sales)),
+            "repeat_buyers": sum(1 for n in buyer_counts.values() if n > 1),
+        },
+        "climate": {
+            "region": farmer.region,
+            "drought_prone": drought,
+            "main_risk": "drought" if drought else "none",
+            "crops": sorted({b.crop_type for b in batches}),
+        },
+    }
+
+
+def profile_json(p: FarmerRiskProfile, farmer: Farmer, evidence: dict[str, Any] | None = None) -> dict[str, Any]:
+    return {
+        "evidence": evidence,
         "farmer_id": farmer.public_id,
         "display_name": farmer.display_name,
         "region": farmer.region,

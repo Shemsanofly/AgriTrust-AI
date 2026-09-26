@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
-from ..ai.profile import DROUGHT_PRONE_REGIONS, build_profile, profile_json
+from ..ai.profile import DROUGHT_PRONE_REGIONS, build_profile, profile_evidence, profile_json
 from ..db import get_session
 from ..i18n import bi, crop_name
 from ..integrations.open_meteo import get_rainfall_total
@@ -119,7 +119,7 @@ def my_profile(user: User = Depends(require_roles(Role.FARMER)), session: Sessio
     farmer = farmer_for(session, user)
     profile = build_profile(session, farmer)
     session.commit()
-    return profile_json(profile, farmer)
+    return profile_json(profile, farmer, profile_evidence(session, farmer))
 
 
 @router.get("/farmers/{public_id}/profile")
@@ -138,7 +138,7 @@ def farmer_profile(public_id: str, user: User = Depends(get_current_user), sessi
         raise HTTPException(status.HTTP_403_FORBIDDEN, "forbidden_role")
     profile = build_profile(session, farmer)
     session.commit()
-    return profile_json(profile, farmer)
+    return profile_json(profile, farmer, profile_evidence(session, farmer))
 
 
 @router.post("/farmers/me/profile/contest", status_code=201)
@@ -320,7 +320,7 @@ def get_loan(loan_id: int, user: User = Depends(get_current_user), session: Sess
         try:
             consent = require_consent(session, farmer.id, user.id, "profile")
             audit(session, user.id, "READ", "PROFILE", farmer.public_id, subject_farmer_id=farmer.id, reason=f"loan#{loan.id} consent#{consent.id}")
-            data["profile"] = profile_json(build_profile(session, farmer), farmer)
+            data["profile"] = profile_json(build_profile(session, farmer), farmer, profile_evidence(session, farmer))
         except HTTPException:
             data["profile"] = None  # consent revoked or expired
         session.commit()

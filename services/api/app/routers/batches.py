@@ -117,9 +117,10 @@ def batch_json(session: Session, batch: CropBatch, detail: bool = False) -> dict
     data["warehouse"] = {"id": wh.id, "public_id": wh.public_id, "name": wh.name, "region": wh.region} if wh else None
     receipt = session.exec(select(WarehouseReceipt).where(WarehouseReceipt.batch_id == batch.id)).first()
     data["receipt"] = receipt.model_dump(mode="json", exclude={"salt"}) if receipt else None
+    data["days_in_storage"] = (date.today() - receipt.date_in).days if receipt else None
     risk = batch_risk(session, batch) if wh else None
     data["risk"] = (
-        {"level": risk.level, "drivers": risk.drivers, "action": risk.action, "stats": risk.stats, "model_version": risk.model_version}
+        {"level": risk.level, "headline": risk.headline, "drivers": risk.drivers, "action": risk.action, "stats": risk.stats, "model_version": risk.model_version}
         if risk
         else None
     )
@@ -203,7 +204,15 @@ def set_listing(batch_id: str, body: ListingIn, user: User = Depends(require_rol
 def storage_risk(batch_id: str, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     batch = load_batch(session, batch_id, user)
     r = batch_risk(session, batch)
-    return {"batch_id": batch.id, "level": r.level, "drivers": r.drivers, "action": r.action, "stats": r.stats, "model_version": r.model_version}
+    return {
+        "batch_id": batch.id,
+        "level": r.level,
+        "headline": r.headline,
+        "drivers": r.drivers,
+        "action": r.action,
+        "stats": r.stats,
+        "model_version": r.model_version,
+    }
 
 
 @router.get("/batches/{batch_id}/storage-history")
