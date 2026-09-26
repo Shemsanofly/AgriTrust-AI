@@ -96,7 +96,7 @@ def anchor(session: Session, entity_type: str, entity_id: str, data_hash: str) -
             record_key=key,
             data_hash=data_hash,
             chain_id=settings.chain_id,
-            tx_hash=receipt.transactionHash.hex(),
+            tx_hash=w3.to_hex(receipt.transactionHash),
             block_number=receipt.blockNumber,
             issuer=account.address,
             mode="ONCHAIN",
@@ -144,7 +144,7 @@ def read_proof(session: Session, proof: BlockchainProof) -> OnChainProof | None:
         data_hash, issuer, ts = contract.functions.getProof(bytes.fromhex(proof.record_key[2:])).call()
         if int(ts) == 0:
             return None
-        return OnChainProof("0x" + data_hash.hex(), issuer, int(ts))
+        return OnChainProof("0x" + bytes(data_hash).hex(), issuer, int(ts))
     entry = session.exec(select(LedgerEntry).where(LedgerEntry.record_key == proof.record_key)).first()
     if not entry:
         return None

@@ -20,3 +20,4 @@ contracts/lib/
 .DS_Store
 .idea/
 .vscode/
+iot/firmware/**/secrets.h
