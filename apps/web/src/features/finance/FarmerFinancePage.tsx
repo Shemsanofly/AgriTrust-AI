@@ -1,41 +1,44 @@
+import { ArrowLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
-import { ErrorState, Loading, PageHeader, Tabs } from '../../components/ui'
+import { Button, ErrorState, Loading, PageHeader, Tabs } from '../../components/ui'
 import { useApi, useErrorText } from '../../lib/hooks'
-import { ContestProfile, InsuranceTab, LoansTab } from './FinanceTabs'
-import { ProfileView, type Profile } from './ProfileView'
+import { InsuranceTab, LoansTab } from './FinanceTabs'
+import { FinancialStatus } from './FinancialStatus'
+import type { Profile } from './ProfileView'
 import { SavingsTab, SharingTab } from './SavingsSharing'
 
-const TABS = ['profile', 'loans', 'insurance', 'savings', 'sharing'] as const
-type Tab = (typeof TABS)[number]
+const TABS = ['status', 'loans', 'savings', 'insurance'] as const
+/** Data sharing is reached from the status tab, not the tab bar. */
+const ALL = [...TABS, 'sharing'] as const
+type Tab = (typeof ALL)[number]
 
 export function FarmerFinancePage() {
   const { t } = useTranslation()
   const errorText = useErrorText()
   const [params, setParams] = useSearchParams()
-  const tab = (TABS as readonly string[]).includes(params.get('tab') ?? '') ? (params.get('tab') as Tab) : 'profile'
+  const tab = (ALL as readonly string[]).includes(params.get('tab') ?? '') ? (params.get('tab') as Tab) : 'status'
+  const open = (id: Tab) => setParams(id === 'status' ? {} : { tab: id }, { replace: true })
   const { data: profile, loading, error, reload } = useApi<Profile>('/farmers/me/profile')
 
   return (
     <div>
       <PageHeader title={t('finance.title')} subtitle={t('finance.subtitle')} />
-      <Tabs value={tab} onChange={(id) => setParams(id === 'profile' ? {} : { tab: id }, { replace: true })} tabs={TABS.map((id) => ({ id, label: t(`finance.tabs.${id}`) }))} />
+      <Tabs value={tab === 'sharing' ? 'status' : tab} onChange={open} tabs={TABS.map((id) => ({ id, label: t(`finance.tabs.${id}`) }))} />
       <div className="mt-5">
-        {tab === 'profile' &&
-          (loading && !profile ? (
-            <Loading rows={4} />
-          ) : error || !profile ? (
-            <ErrorState text={errorText(error)} onRetry={reload} />
-          ) : (
-            <div className="space-y-5">
-              <ProfileView profile={profile} />
-              <ContestProfile />
-            </div>
-          ))}
+        {tab === 'status' &&
+          (loading && !profile ? <Loading rows={4} /> : error || !profile ? <ErrorState text={errorText(error)} onRetry={reload} /> : <FinancialStatus profile={profile} onOpen={open} />)}
         {tab === 'loans' && <LoansTab profile={profile} />}
-        {tab === 'insurance' && <InsuranceTab profile={profile} />}
         {tab === 'savings' && <SavingsTab />}
-        {tab === 'sharing' && <SharingTab />}
+        {tab === 'insurance' && <InsuranceTab profile={profile} />}
+        {tab === 'sharing' && (
+          <div className="space-y-4">
+            <Button variant="ghost" size="sm" icon={ArrowLeft} onClick={() => open('status')}>
+              {t('finance.tabs.status')}
+            </Button>
+            <SharingTab />
+          </div>
+        )}
       </div>
     </div>
   )

@@ -1,4 +1,6 @@
+import socket
 from functools import lru_cache
+from urllib.parse import urlsplit, urlunsplit
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -47,3 +49,23 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def _lan_ip() -> str | None:
+    """This machine's address on the local network (no packets are sent)."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except OSError:
+        return None
+
+
+@lru_cache
+def public_web_url() -> str:
+    """Base URL printed in QR codes. A localhost PUBLIC_WEB_URL is useless to a phone
+    scanning the code, so swap in the LAN address; any real domain is used as-is."""
+    url = urlsplit(get_settings().public_web_url.rstrip("/"))
+    if url.hostname in ("localhost", "127.0.0.1") and (ip := _lan_ip()):
+        return urlunsplit(url._replace(netloc=f"{ip}:{url.port}" if url.port else ip))
+    return url.geturl()
