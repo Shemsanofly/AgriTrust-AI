@@ -70,6 +70,8 @@ def test_full_demo_journey(client, login):
 
     v = client.get(f"/verify/{batch_id}").json()
     assert v["status"] == "VERIFIED" and [s["stage"] for s in v["stages"]] == ["SHAMBANI", "GHALANI"]
+    qr = client.get(f"/qr/{batch_id}.svg")
+    assert qr.status_code == 200 and qr.headers["content-type"].startswith("image/svg+xml")
 
     # Tamper demo: silent DB edit -> MISMATCH, restore -> VERIFIED
     client.post(f"/demo/tamper/{batch_id}", headers=admin)

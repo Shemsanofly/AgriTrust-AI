@@ -4,8 +4,9 @@ from datetime import date, timedelta
 from typing import Optional
 
 import qrcode
+from qrcode.image.svg import SvgPathImage
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
@@ -231,14 +232,13 @@ def anchor_storage_window(
     return {**record.model_dump(mode="json", exclude={"salt"}), "verification": verify_entity(session, "STORAGE", record)}
 
 
-@router.get("/qr/{record_id}.png")
-def qr_png(record_id: str):
+@router.get("/qr/{record_id}.svg")
+def qr_svg(record_id: str):
     """QR code pointing to the public verify page (printable on bags and receipts)."""
-    img = qrcode.make(f"{get_settings().public_web_url}/verify/{record_id}", box_size=8, border=2)
+    img = qrcode.make(f"{get_settings().public_web_url}/verify/{record_id}", image_factory=SvgPathImage, box_size=10, border=2)
     buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    buf.seek(0)
-    return StreamingResponse(buf, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+    img.save(buf)
+    return Response(buf.getvalue(), media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400"})
 
 
 # ---------------------------------------------------------------- warehouses

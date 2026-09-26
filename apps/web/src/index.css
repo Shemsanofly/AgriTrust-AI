@@ -1,0 +1,28 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-brand-50: #f0fdf4;
+  --color-brand-100: #dcfce7;
+  --color-brand-600: #16a34a;
+  --color-brand-700: #15803d;
+  --color-brand-800: #166534;
+  --color-brand-900: #14532d;
+  --color-soil: #7c5a3a;
+  --color-paper: #f7f7f2;
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+html,
+body {
+  background: var(--color-paper);
+  color: #1c1917;
+}
+
+@layer components {
+  .input {
+    @apply w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-base outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100;
+  }
+  .label {
+    @apply mb-1 block text-sm font-medium text-stone-700;
+  }
+}
