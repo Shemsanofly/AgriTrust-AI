@@ -5,7 +5,7 @@
 Every demo account uses PIN 1234."""
 
 import math
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from sqlmodel import Session, SQLModel, select
 
@@ -61,6 +61,11 @@ def _readings(session: Session, sensor: Sensor, hours: int, every_min: int, fn) 
     sensor.last_seq = n
     sensor.last_seen_at = now - timedelta(minutes=every_min)
     session.add(sensor)
+
+
+def _at(d: date) -> datetime:
+    """Historical records get their real dates, not the time the seed ran."""
+    return datetime(d.year, d.month, d.day, 9, 0, tzinfo=timezone.utc)
 
 
 def seed() -> None:
@@ -155,14 +160,14 @@ def seed() -> None:
         old = CropBatch(
             id="BATCH-1A2B", harvest_id=h.id, farmer_id=neema.id, crop_type="maize", harvest_date=h.harvest_date,
             quantity_kg=1800, available_kg=300, grade="A", status="IN_STORAGE", warehouse_id=wh.id,
-            listed=True, price_per_kg=780, salt=new_salt(),
+            listed=True, price_per_kg=780, salt=new_salt(), created_at=_at(h.harvest_date),
         )
         s.add(old)
         anchor_entity(s, "BATCH", old)
         receipt = WarehouseReceipt(
             id=f"WR-{today.year}-000001", batch_id=old.id, warehouse_id=wh.id, owner_farmer_id=neema.id,
             quantity_kg=1800, released_kg=1500, grade="A", date_in=today - timedelta(days=178), bay="B-2",
-            status="PARTIALLY_RELEASED", salt=new_salt(),
+            status="PARTIALLY_RELEASED", salt=new_salt(), created_at=_at(today - timedelta(days=178)),
         )
         s.add(receipt)
         anchor_entity(s, "RECEIPT", receipt)
@@ -220,7 +225,7 @@ def seed() -> None:
             batch = CropBatch(
                 id=f"BATCH-{public_id[-4:]}", harvest_id=harvest.id, farmer_id=farmer.id, crop_type=crop_type, harvest_date=harvest.harvest_date,
                 quantity_kg=harvest.quantity_kg, available_kg=kg, grade=grade, status="IN_STORAGE", warehouse_id=wh.id,
-                listed=True, price_per_kg=price, salt=new_salt(),
+                listed=True, price_per_kg=price, salt=new_salt(), created_at=_at(harvest.harvest_date),
             )
             s.add(batch)
             anchor_entity(s, "BATCH", batch)
@@ -228,6 +233,7 @@ def seed() -> None:
             receipt = WarehouseReceipt(
                 id=f"WR-{today.year}-{n:06d}", batch_id=batch.id, warehouse_id=wh.id, owner_farmer_id=farmer.id,
                 quantity_kg=kg, grade=grade, date_in=today - timedelta(days=days_ago - 3), bay=bay, salt=new_salt(),
+                created_at=_at(today - timedelta(days=days_ago - 3)),
             )
             s.add(receipt)
             anchor_entity(s, "RECEIPT", receipt)

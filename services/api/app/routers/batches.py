@@ -118,6 +118,8 @@ def batch_json(session: Session, batch: CropBatch, detail: bool = False) -> dict
     receipt = session.exec(select(WarehouseReceipt).where(WarehouseReceipt.batch_id == batch.id)).first()
     data["receipt"] = receipt.model_dump(mode="json", exclude={"salt"}) if receipt else None
     data["days_in_storage"] = (date.today() - receipt.date_in).days if receipt else None
+    owner = session.get(Farmer, batch.farmer_id)
+    data["owner"] = {"public_id": owner.public_id, "display_name": owner.display_name, "cooperative": owner.cooperative} if owner else None
     risk = batch_risk(session, batch) if wh else None
     data["risk"] = (
         {"level": risk.level, "headline": risk.headline, "drivers": risk.drivers, "action": risk.action, "stats": risk.stats, "model_version": risk.model_version}

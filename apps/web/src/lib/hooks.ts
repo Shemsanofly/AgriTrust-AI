@@ -50,6 +50,7 @@ export function useFormat() {
   const { i18n } = useTranslation()
   const locale = (i18n.resolvedLanguage ?? 'sw').startsWith('en') ? 'en-TZ' : 'sw-TZ'
   return {
+    locale,
     num: (n: number | null | undefined, digits = 0) =>
       n == null ? '—' : new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(n),
     tzs: (n: number | null | undefined) =>
@@ -57,6 +58,22 @@ export function useFormat() {
     date: (s: string | null | undefined) => (s ? new Date(s).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' }) : '—'),
     dateTime: (s: string | null | undefined) =>
       s ? new Date(s).toLocaleString(locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—',
+    relative: (s: string | null | undefined) => {
+      if (!s) return '—'
+      const diff = (Date.now() - new Date(s).getTime()) / 1000
+      const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' })
+      if (Math.abs(diff) < 60) return rtf.format(0, 'second')
+      if (Math.abs(diff) < 3600) return rtf.format(-Math.round(diff / 60), 'minute')
+      if (Math.abs(diff) < 86400) return rtf.format(-Math.round(diff / 3600), 'hour')
+      if (Math.abs(diff) < 86400 * 7) return rtf.format(-Math.round(diff / 86400), 'day')
+      return new Date(s).toLocaleDateString(locale, { day: 'numeric', month: 'short' })
+    },
+    kg: (n: number | null | undefined) => {
+      if (n == null) return '—'
+      if (n >= 1000) return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(n / 1000)} t`
+      return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(n)} kg`
+    },
+    month: (ym: string) => new Date(`${ym}-01T00:00:00`).toLocaleDateString(locale, { month: 'long', year: 'numeric' }),
     weekday: (s: string) => new Date(s).toLocaleDateString(locale, { weekday: 'short' }),
     time: (s: string) => new Date(s).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }),
   }

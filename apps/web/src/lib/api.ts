@@ -8,10 +8,26 @@ type Tokens = { access_token: string; refresh_token: string }
 export class ApiError extends Error {
   status: number
   code: string
-  constructor(status: number, code: string) {
+  details: Record<string, unknown>
+  constructor(status: number, code: string, details: Record<string, unknown> = {}) {
     super(code)
     this.status = status
     this.code = code
+    this.details = details
+  }
+}
+
+/** A random id kept on this device so the server can recognise it (never a hardware id). */
+export function deviceId(): string {
+  try {
+    let id = localStorage.getItem('shamba.device')
+    if (!id) {
+      id = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`
+      localStorage.setItem('shamba.device', id)
+    }
+    return id
+  } catch {
+    return 'no-storage'
   }
 }
 
@@ -40,7 +56,7 @@ async function refreshTokens(): Promise<boolean> {
   if (!tokens) return false
   refreshing ??= fetch(`${BASE}/auth/refresh`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-Device-Id': deviceId() },
     body: JSON.stringify({ refresh_token: tokens.refresh_token }),
   })
     .then(async (r) => {
@@ -62,7 +78,7 @@ async function refreshTokens(): Promise<boolean> {
 export async function api<T = any>(path: string, options: { method?: string; body?: unknown; auth?: boolean } = {}): Promise<T> {
   const { method = 'GET', body, auth = true } = options
   const doFetch = () => {
-    const headers: Record<string, string> = { 'Accept-Language': currentLang() }
+    const headers: Record<string, string> = { 'Accept-Language': currentLang(), 'X-Device-Id': deviceId() }
     if (body !== undefined) headers['Content-Type'] = 'application/json'
     const tokens = getTokens()
     if (auth && tokens) headers.Authorization = `Bearer ${tokens.access_token}`
@@ -82,7 +98,7 @@ export async function api<T = any>(path: string, options: { method?: string; bod
   if (!res.ok) {
     const detail = data?.detail
     const code = typeof detail === 'string' ? detail : res.status === 422 ? 'validation' : 'unknown'
-    throw new ApiError(res.status, code)
+    throw new ApiError(res.status, code, data && typeof data === 'object' ? data : {})
   }
   return data as T
 }

@@ -202,7 +202,7 @@ flowchart LR
 | 16 | Insurance recommendation and claims | `SIMULATED` insurer | [§13](#13-insurance) |
 | 17 | Parametric insurance demo | `SIMULATED` | [§13](#13-insurance) |
 | 18 | Savings planner | `MVP` planner; account linking is `FUTURE` | [§14](#14-savings-and-financial-resilience) |
-| 19 | Biometric login and confirmation | `FUTURE` (WebAuthn / passkeys). The MVP uses phone + PIN + SMS OTP, with PIN step-up for sensitive actions | [§16](#16-biometric-security) |
+| 19 | Biometric login and confirmation | `MVP` (WebAuthn passkeys with the phone's fingerprint / face unlock; PIN + SMS OTP always available as fallback) | [§16](#16-biometric-security) |
 | 20 | Kiswahili + English UI | `MVP` (switch on every screen; preference saved per user and used for SMS) | [§6.5](#65-low-connectivity-design-tanzania-first) |
 | 21 | SMS alerts | `MVP` (sandbox) | [§22](#22-apis-and-integrations) |
 | 22 | USSD access | `FUTURE` | [§6.5](#65-low-connectivity-design-tanzania-first) |
@@ -1033,8 +1033,9 @@ shamba-kifedha/
 │   └── web/                     # React + Vite + TypeScript PWA (all roles)
 │       ├── src/
 │       │   ├── i18n/            # sw.json, en.json (+ index.ts: detector, default Kiswahili)
-│       │   ├── features/        # farm, ghala, marketplace, orders, finance, admin, verify, auth
-│       │   ├── components/      # LanguageSwitcher, PinDialog, charts, alerts, UI kit
+│       │   ├── app/nav.ts       # role-based navigation (mirrors the routes in App.tsx)
+│       │   ├── features/        # farmer, ghala, marketplace, orders, finance, verify, account, admin, auth
+│       │   ├── components/      # ui.tsx (design system), Layout, ConfirmAction, charts, crops, alerts
 │       │   └── lib/             # api client (token refresh), auth context, hooks
 │       └── scripts/check-i18n.mjs   # fails the build if sw/en keys or placeholders differ
 ├── services/
@@ -1100,10 +1101,28 @@ Or everything with Docker (PostgreSQL): `docker compose up --build`, then `docke
 
 | Action | Where |
 |---|---|
-| Soil drying / rain | Farmer dashboard buttons → `POST /demo/scenario/soil-drying`, `soil-wet` |
-| Ghala humidity rising / ventilate | Warehouse dashboard buttons → `ghala-humid`, `ghala-normal` |
-| Tamper demo (✅ → ⚠️ → ✅) | Admin → Tamper demo → `POST /demo/tamper/{batch}` and `/demo/restore/{batch}` |
+| Soil drying / rain coming / after rain | Farmer home → Demo controls → `POST /demo/scenario/soil-drying`, `soil-wet`, `/demo/weather/{rain,dry,live}` |
+| Ghala humidity rising / ventilate | Warehouse overview → Demo controls → `ghala-humid`, `ghala-normal` |
+| Tamper demo (✅ → ⚠️ → ✅) | Admin → Demo tools → `POST /demo/tamper/{batch}` and `/demo/restore/{batch}` |
 | Sandbox OTP | Shown on screen after registration |
+
+### Design system
+
+The web app uses one small design system (`apps/web/src/components/ui.tsx` + tokens in `src/index.css`), taken from the pitch deck:
+
+| Token | Use |
+|---|---|
+| Forest green `#1f5134` | Primary actions, "good" states |
+| Harvest gold `#e2a72e` | Next step, highlights, harvest month |
+| Terracotta `#a9542a` | Temperature, secondary emphasis |
+| Paper `#f7f2e6` / surface `#fffdf7` | Backgrounds |
+| Amber / red | Only for real risk (MEDIUM / HIGH), always with an icon and a word |
+
+Inter (self-hosted) and Lucide icons. Risk is never shown by colour alone. Recommendations always show *why* ("Why this recommendation"). Money-affecting AI output is labelled as decision support, and lenders and insurers record human decisions with a reason. Every simulated component is labelled.
+
+Navigation per role lives in `src/app/nav.ts`: farmers get Home, My farm, Ghala, Market, Finance (with alerts in the top bar); buyers get Marketplace, My orders, Verify batches, Suppliers, Payments; warehouses get Overview, Stock, Intake, Releases, Alerts; banks get Overview, Farmers, Applications, Risk profiles, Loan book; insurers get Overview, Policies, Farm risk, Claims.
+
+Crop photos in `apps/web/public/images` are from Wikimedia Commons: maize kernels (Danielgrad, CC BY-SA 3.0), rice (JoabJacob, CC BY-SA 4.0), sorghum (Salil Kumar Mukherjee, CC BY-SA 4.0), kidney beans (David E Mead, CC0), sunflower seeds (Kaldari, public domain), maize farm in Tanzania (Evancez, CC BY-SA 4.0).
 
 ### Using a real chain
 
@@ -1115,7 +1134,8 @@ Deploy the contracts (see `contracts/README.md`), then set `RPC_URL`, `CHAIN_ID`
 |---|---|
 | End-to-end demo path (§23) | Built and covered by `tests/test_journey.py` |
 | Irrigation, spoilage, profile, fraud rules | Built (rules). ML classifier and SHAP explanations are `FUTURE` |
-| WebAuthn / passkeys | Not built; PIN + OTP + PIN step-up instead |
+| WebAuthn / passkeys | Built: enrol in Profile & security, sign in, and confirm sensitive actions (a 5-minute step-up token replaces the PIN). Only public keys are stored. Challenges are kept in memory, so run one API worker or move them to Redis |
+| Soil test (pH, N, P, K) | Optional on each farm; used in the planting advice. Values come from a lab, the TARI soil map or the farmer |
 | Receipt PDF, map view (Leaflet) | Not built; receipts have QR + verify page, farms use GPS coordinates |
 | Offline | App shell and recent GET responses cached by the service worker; queued writes are `FUTURE` |
 | Database migrations | Tables are created on start-up; Alembic migrations are `FUTURE` |
