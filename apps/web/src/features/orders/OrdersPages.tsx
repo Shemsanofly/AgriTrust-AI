@@ -7,6 +7,7 @@ import { Badge, Card, EmptyState, ErrorState, Loading, PageHeader, Stat, StatStr
 import { useApi, useErrorText, useFormat } from '../../lib/hooks'
 import type { Batch } from '../farmer/shared'
 import { OrderList, useOrders, type Order } from './OrderList'
+import { FarmerContracts, type Contract } from '../contracts/ContractsPages'
 
 const OPEN = ['REQUESTED', 'ACCEPTED', 'PAID', 'RELEASED', 'DELIVERED']
 
@@ -21,7 +22,9 @@ export function FarmerMarketPage() {
   const errorText = useErrorText()
   const { data: orders, loading, error, reload } = useOrders()
   const { data: batches } = useApi<Batch[]>('/batches')
-  const [tab, setTab] = useState<'orders' | 'listings' | 'history'>('orders')
+  const { data: contracts, reload: reloadContracts } = useApi<Contract[]>('/contracts')
+  const [tab, setTab] = useState<'orders' | 'contracts' | 'listings' | 'history'>('orders')
+  const offers = (contracts ?? []).filter((c) => c.status === 'OFFERED').length
   const { open, done } = split(orders ?? [])
   const listed = (batches ?? []).filter((b) => b.listed)
   const sold = (orders ?? []).filter((o) => o.status === 'SALE_CONFIRMED')
@@ -40,6 +43,7 @@ export function FarmerMarketPage() {
           onChange={setTab}
           tabs={[
             { id: 'orders', label: t('market.requests'), count: open.length },
+            { id: 'contracts', label: t('contracts.title'), count: offers },
             { id: 'listings', label: t('market.myListings'), count: listed.length },
             { id: 'history', label: t('market.history'), count: done.length },
           ]}
@@ -52,6 +56,8 @@ export function FarmerMarketPage() {
           <ErrorState text={errorText(error)} onRetry={reload} />
         ) : tab === 'orders' ? (
           <OrderList orders={open} onChanged={reload} emptyTitle={t('market.noRequests')} emptyBody={t('market.noRequestsBody')} />
+        ) : tab === 'contracts' ? (
+          <FarmerContracts contracts={contracts ?? []} onChanged={reloadContracts} />
         ) : tab === 'history' ? (
           <OrderList orders={done} onChanged={reload} emptyTitle={t('market.noHistory')} />
         ) : (

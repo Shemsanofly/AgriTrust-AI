@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .chain.anchor import chain_mode
 from .config import get_settings
 from .db import init_db
-from .routers import admin, auth, batches, demo, farms, finance, iot, market, verify, webauthn
+from .routers import admin, auth, batches, contracts, demo, face, farms, finance, iot, market, verify, webauthn
 
 logging.basicConfig(level=logging.INFO)
 
@@ -33,7 +33,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for module in (auth, webauthn, farms, iot, batches, market, verify, finance, admin, demo):
+for module in (auth, webauthn, face, farms, iot, batches, market, contracts, verify, finance, admin, demo):
     app.include_router(module.router)
 app.include_router(auth.me_router)
 

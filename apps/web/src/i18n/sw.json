@@ -54,7 +54,8 @@
     "audit": "Kumbukumbu za ukaguzi",
     "users": "Watumiaji",
     "sms": "Kumbukumbu za SMS",
-    "demoTools": "Zana za maonyesho"
+    "demoTools": "Zana za maonyesho",
+    "contracts": "Mikataba"
   },
   "roles": {
     "FARMER": "Mkulima",
@@ -112,7 +113,6 @@
     "businessName": "Jina la biashara",
     "country": "Nchi",
     "continue": "Endelea",
-    "languageSaved": "Tutatumia lugha unayotumia sasa kwenye programu na SMS. Unaweza kuibadilisha wakati wowote.",
     "otpTitle": "Thibitisha simu yako",
     "otpSent": "Weka nambari ya tarakimu 6 tuliyotuma kwa {{phone}}.",
     "devOtp": "Maonyesho: nambari yako ni {{code}}",
@@ -123,7 +123,8 @@
     "securityNote": "Usimpe mtu yeyote PIN au nambari ya SMS, hata afisa ugani.",
     "demoAccounts": "Akaunti za maonyesho",
     "demoHint": "Gusa moja kujaza namba ya simu na PIN (1234).",
-    "photoCredit": "Shamba la mahindi, Tanzania · Picha: Evancez, CC BY-SA 4.0"
+    "photoCredit": "Shamba la mahindi, Tanzania · Picha: Evancez, CC BY-SA 4.0",
+    "countryCode": "Msimbo wa nchi"
   },
   "security": {
     "title": "Usalama",
@@ -158,7 +159,8 @@
     "method": {
       "pin": "PIN",
       "otp": "Nambari ya SMS",
-      "biometric": "Kidole / uso"
+      "biometric": "Kidole / uso",
+      "face": "Face ID"
     },
     "newDeviceTitle": "Kifaa kipya",
     "newDeviceBody": "Hii ni mara ya kwanza kuingia kutoka kifaa hiki. Tumekutumia SMS kuhusu hili.",
@@ -271,7 +273,9 @@
     "FILED": "Limewasilishwa",
     "EVIDENCE_ATTACHED": "Ushahidi umeambatishwa",
     "EXPIRED": "Muda umeisha",
-    "REVOKED": "Imesitishwa"
+    "REVOKED": "Imesitishwa",
+    "OFFERED": "Imetolewa",
+    "FULFILLED": "Imetekelezwa"
   },
   "demo": {
     "controls": "Vidhibiti vya maonyesho",
@@ -381,7 +385,10 @@
       "low": "Mdogo",
       "medium": "Wa kati",
       "high": "Mkubwa"
-    }
+    },
+    "findingPlace": "Inatafuta mahali…",
+    "nearestRegion": "mkoa wa karibu (bila intaneti)",
+    "gpsHint": "Bofya kitufe cha mahali ukiwa shambani: mahali na mkoa vitajazwa vyenyewe."
   },
   "ghala": {
     "farmerTitle": "Ghala",
@@ -1027,7 +1034,6 @@
     "scanSubtitle": "Changanua QR kwenye gunia au stakabadhi, au andika namba.",
     "scanQr": "Changanua QR",
     "stopCamera": "Simamisha",
-    "scanUnsupported": "Kivinjari hiki hakiwezi kuchanganua. Andika namba iliyo chini ya QR badala yake.",
     "cameraDenied": "Ruhusa ya kamera imekataliwa. Andika namba badala yake.",
     "enterCode": "Namba ya kundi, stakabadhi au mauzo",
     "check": "Kagua",
@@ -1035,7 +1041,11 @@
     "buyerSubtitle": "Kagua safari ya kundi lolote kabla na baada ya kununua.",
     "yourBatches": "Makundi uliyoagiza",
     "noBatchesYet": "Bado hujaagiza kundi lolote.",
-    "inMarket": "Yaliyo sokoni sasa"
+    "inMarket": "Yaliyo sokoni sasa",
+    "scanPhoto": "Changanua kwa picha",
+    "cameraNeedsHttps": "Kamera ya moja kwa moja hufanya kazi kwenye kiungo salama (https) tu. Bofya \"Changanua kwa picha\" upige picha ya QR, au andika namba.",
+    "noCamera": "Kamera haijapatikana. Bofya \"Changanua kwa picha\" au andika namba.",
+    "noQrInPhoto": "Hakuna QR kwenye picha hiyo. Shika simu imara, jaza QR kwenye picha na ujaribu tena."
   },
   "payments": {
     "subtitle": "Malipo ya oda zako.",
@@ -1144,7 +1154,7 @@
     "needs_warehouse_receipt": "Mzigo wenye stakabadhi ya ghala pekee ndio unaoweza kuuzwa.",
     "price_required": "Weka bei kwanza.",
     "insufficient_quantity": "Mzigo unaopatikana hautoshi.",
-    "invalid_transition": "Hatua hiyo haiwezekani sasa.",
+    "invalid_transition": "Mkataba huu umeshabadilika. Onyesha upya na ujaribu tena.",
     "no_receipt": "Kundi hili halina stakabadhi ya ghala.",
     "batch_already_stored": "Kundi hili tayari liko ghalani.",
     "warehouse_not_verified": "Ghala hili halijathibitishwa.",
@@ -1164,6 +1174,100 @@
     "invalid_stage": "Hatua ya zao si sahihi.",
     "no_passkey": "Kuingia kwa kidole hakujawekwa kwa namba hii.",
     "biometric_failed": "Ukaguzi wa kidole au uso umeshindwa. Tumia PIN yako.",
-    "biometric_expired": "Imechukua muda mrefu. Jaribu tena."
+    "biometric_expired": "Imechukua muda mrefu. Jaribu tena.",
+    "face_in_use": "Uso huu tayari umewekwa kwenye akaunti nyingine.",
+    "face_not_recognised": "Hatukuweza kutambua uso huu. Jaribu tena au tumia PIN yako.",
+    "face_unavailable": "Face ID haiwezi kukaguliwa sasa. Tumia PIN yako.",
+    "face_disabled": "Face ID haipatikani.",
+    "delivery_in_past": "Mwezi wa kupeleka umeshapita."
+  },
+  "face": {
+    "title": "Face ID",
+    "signIn": "Ingia kwa Face ID",
+    "setupTitle": "Weka Face ID",
+    "setupSubtitle": "Si lazima: wakati ujao, ingia kwa kuangalia kamera badala ya kuandika PIN.",
+    "setup": "Weka Face ID",
+    "skip": "Ruka kwa sasa",
+    "on": "Face ID imewashwa",
+    "removed": "Face ID imeondolewa",
+    "privacy": "Face ID inatolewa na FACEIO. Wao huhifadhi kiolezo cha uso ili kukutambua; programu hii huhifadhi namba ya siri tu, kamwe si picha yako. PIN yako inafanya kazi daima, na unaweza kuondoa Face ID wakati wowote kwenye Wasifu na usalama.",
+    "tips": {
+      "light": "Angalia upande wenye mwanga, si dirisha nyuma yako.",
+      "still": "Shika simu usawa wa macho na utulie kwa sekunde chache.",
+      "alone": "Uso wako tu uonekane kwenye kamera."
+    },
+    "err": {
+      "camera": "Ruhusa ya kamera imekataliwa. Ruhusu kamera na ujaribu tena.",
+      "noFace": "Uso haujaonekana vizuri. Nenda kwenye mwanga zaidi, uso wako tu uonekane.",
+      "unknown": "Hatukuweza kutambua uso huu. Jaribu tena au tumia PIN yako.",
+      "notLinked": "Uso huu bado haujaunganishwa na akaunti. Ingia kwa PIN, kisha weka Face ID kwenye Wasifu na usalama.",
+      "duplicate": "Uso huu tayari umewekwa kwenye akaunti nyingine.",
+      "timeout": "Imechukua muda mrefu. Jaribu tena.",
+      "offline": "Face ID inahitaji intaneti. Jaribu tena au tumia PIN yako.",
+      "setup": "Face ID bado haijawekwa kwa anwani hii ya tovuti. Tumia PIN yako kwa sasa.",
+      "cancelled": "Face ID imesitishwa.",
+      "failed": "Face ID haikufanya kazi safari hii. Jaribu tena au tumia PIN yako."
+    }
+  },
+  "credit": {
+    "title": "Jinsi tathmini ya mkopo wako inavyofanywa",
+    "subtitle": "Vigezo vitano, kila kimoja kwa alama 100. Bofya kimoja kuona sababu.",
+    "weight": "{{pct}}% ya alama",
+    "level": {
+      "good": "Imara",
+      "fair": "Wastani",
+      "weak": "Dhaifu"
+    }
+  },
+  "contracts": {
+    "title": "Mikataba",
+    "buyerSubtitle": "Kubali sasa kununua sehemu ya mavuno yajayo ya mkulima kwa bei maalum. Humpa mkulima soko la uhakika na humsaidia kupata mkopo.",
+    "farmerNote": "Mkataba ni ahadi ya mnunuzi kununua sehemu ya mavuno yako yajayo kwa bei maalum. Mikataba uliyokubali huimarisha tathmini ya mkopo wako.",
+    "offer": "Toa mkataba",
+    "offerTitle": "Toa mkataba",
+    "farmer": "Mkulima",
+    "buyer": "Mnunuzi",
+    "chooseFarmer": "Chagua mkulima",
+    "pickFarmer": "Chagua mkulima kwanza.",
+    "pickMonth": "Chagua mwezi wa kupeleka kuanzia mwezi huu.",
+    "growing": "Analima: {{crops}}",
+    "notGrowing": "Hakuna zao shambani kwa sasa",
+    "nextHarvest": "mavuno yajayo {{date}}",
+    "crop": "Zao",
+    "quantity": "Kiasi (kg)",
+    "price": "Bei",
+    "pricePerKg": "Bei kwa kg (TZS)",
+    "total": "Thamani yote",
+    "totalValue": "Thamani yote: {{value}}",
+    "delivery": "Mwezi wa kupeleka",
+    "deliveryIn": "kupeleka {{month}}",
+    "note": "Ujumbe kwa mkulima",
+    "notePlaceholder": "Ubora, mahali pa kupeleka, jinsi utakavyolipa…",
+    "send": "Tuma ofa",
+    "sent": "Ofa imetumwa kwa {{name}}",
+    "verifiedBuyer": "Mnunuzi aliyethibitishwa",
+    "accept": "Kubali",
+    "decline": "Kataa",
+    "withdraw": "Ondoa ofa",
+    "markDelivered": "Weka imepelekwa",
+    "acceptNote": "Kwa kukubali, unakubali kupeleka kiasi hiki katika mwezi huo kwa bei hii. Wakopeshaji wanaweza kuona mikataba uliyokubali unaposhiriki rekodi yako.",
+    "activeSummary_one": "Mkataba {{count}} unaoendelea · {{kg}} · {{value}}",
+    "activeSummary_other": "Mikataba {{count}} inayoendelea · {{kg}} · {{value}}",
+    "noneFarmer": "Bado hakuna ofa za mkataba",
+    "noneFarmerBody": "Mnunuzi akitaka kununua mavuno yako yajayo, ofa itaonekana hapa.",
+    "noneBuyer": "Bado hakuna mikataba",
+    "noneBuyerBody": "Toa mkataba ili upate uhakika wa mzigo kutoka mavuno yajayo ya mkulima.",
+    "confirm": {
+      "accept": "Kubali mkataba huu?",
+      "decline": "Kataa ofa hii?",
+      "cancel": "Ondoa ofa hii?",
+      "fulfil": "Weka mkataba huu kuwa umepelekwa?"
+    },
+    "done": {
+      "accept": "Mkataba umekubaliwa",
+      "decline": "Ofa imekataliwa",
+      "cancel": "Ofa imeondolewa",
+      "fulfil": "Mkataba umewekwa kuwa umepelekwa"
+    }
   }
 }

@@ -23,7 +23,7 @@ from ..models import (
     WarehouseReceipt,
 )
 
-MODEL_VERSION = "scorecard-v0.1 (hackathon)"
+MODEL_VERSION = "credit-5-criteria-v0.2"
 DROUGHT_PRONE_REGIONS = {"dodoma", "singida", "shinyanga", "simiyu", "manyara", "tabora"}
 YIELD_KG_PER_ACRE = {"maize": 700.0, "beans": 350.0, "rice": 900.0, "sorghum": 500.0, "sunflower": 400.0}
 DEFAULT_PRICE_TZS = {"maize": 750.0, "beans": 2200.0, "rice": 1800.0, "sorghum": 700.0, "sunflower": 1100.0}
@@ -66,7 +66,251 @@ def cash_flow(session: Session, farmer: Farmer, sales: list[Sale]) -> dict[str, 
     }
 
 
+# The five credit criteria and their weights in the overall score (sum 100).
+CRITERIA_WEIGHTS = {"transactions": 25, "farm": 15, "production": 25, "offtake": 15, "condition": 20}
+MOISTURE_OK = (25.0, 55.0)
+PH_OK = (5.5, 7.5)
+SOIL_TEMP_OK = (15.0, 35.0)
+
+
+def _level(score: float) -> str:
+    return "good" if score >= 70 else "fair" if score >= 45 else "weak"
+
+
+def _criterion(key: str, score: float, findings: list[tuple[bool, dict[str, str]]], facts: dict[str, Any]) -> dict[str, Any]:
+    score = max(0.0, min(100.0, score))
+    return {
+        "key": key,
+        "title": bi(f"credit.c.{key}"),
+        "weight": CRITERIA_WEIGHTS[key],
+        "score": round(score),
+        "level": _level(score),
+        "findings": [{"good": good, "text": text} for good, text in findings],
+        "facts": facts,
+    }
+
+
+def _transactions(session: Session, farmer: Farmer, sales: list[Sale]) -> dict[str, Any]:
+    """1. Money earned, repaid and saved: shows the farmer can generate and manage cash."""
+    from ..models import LoanApplication, SavingsGoal
+
+    loans = list(session.exec(select(LoanApplication).where(LoanApplication.farmer_id == farmer.id)))
+    repaid = sum(1 for loan in loans if loan.status == "CLOSED")
+    repaying = sum(1 for loan in loans if loan.status == "REPAYING")
+    goals = list(session.exec(select(SavingsGoal).where(SavingsGoal.farmer_id == farmer.id)))
+    saved = sum(g.saved_amount for g in goals)
+    buyers = {s.buyer_id for s in sales}
+    income = sum(s.amount for s in sales)
+    score, findings = 20.0, []
+    if sales:
+        score += min(40, 10 * len(sales)) + (10 if len(buyers) >= 2 else 0)
+        findings.append((True, bi("credit.tx.sales", sales=len(sales), amount=round(income), buyers=len(buyers))))
+    else:
+        findings.append((False, bi("credit.tx.no_sales")))
+    if repaid:
+        score += min(20, 15 * repaid)
+        findings.append((True, bi("credit.tx.repaid", count=repaid)))
+    if repaying:
+        score += 5
+        findings.append((True, bi("credit.tx.repaying", count=repaying)))
+    if saved > 0:
+        score += 10
+        findings.append((True, bi("credit.tx.savings", amount=round(saved), goals=len(goals))))
+    else:
+        findings.append((False, bi("credit.tx.no_savings")))
+    facts = {
+        "verified_sales": len(sales),
+        "income_tzs": round(income),
+        "distinct_buyers": len(buyers),
+        "loans_repaid": repaid,
+        "loans_repaying": repaying,
+        "savings_tzs": round(saved),
+    }
+    return _criterion("transactions", score, findings, facts)
+
+
+def _farm(farmer: Farmer, farms: list[Farm], crops: list[Crop], price_for) -> dict[str, Any]:
+    """2. Size and location: production capacity and the climate risk of where it is."""
+    if not farms:
+        return _criterion("farm", 20, [(False, bi("credit.farm.no_farm"))], {"acres": 0, "farms": 0})
+    acres = sum(f.acreage for f in farms)
+    growing = {f.id: next((c.crop_type for c in crops if c.farm_id == f.id and c.growth_stage != "harvested"), "maize") for f in farms}
+    kg = sum(f.acreage * YIELD_KG_PER_ACRE.get(growing[f.id], 600.0) for f in farms)
+    value = sum(f.acreage * YIELD_KG_PER_ACRE.get(growing[f.id], 600.0) * price_for(growing[f.id]) for f in farms)
+    score = 35.0 if acres < 1 else 55.0 if acres < 3 else 70.0 if acres < 10 else 80.0
+    findings = [(acres >= 1, bi("credit.farm.size", acres=round(acres, 1), farms=len(farms), kg=round(kg), value=round(value, -3)))]
+    if acres < 1:
+        findings.append((False, bi("credit.farm.small")))
+    drought = farmer.region.strip().lower() in DROUGHT_PRONE_REGIONS
+    irrigated = any(f.irrigation_type != "rainfed" for f in farms)
+    if not drought:
+        score += 10
+        findings.append((True, bi("credit.farm.good_zone", region=farmer.region)))
+    elif irrigated:
+        score += 5
+        findings.append((True, bi("credit.farm.drought_irrigated", region=farmer.region)))
+    else:
+        score -= 15
+        findings.append((False, bi("credit.farm.drought_rainfed", region=farmer.region)))
+    crop_types = {c.crop_type for c in crops}
+    if drought and len(crop_types) == 1:
+        score -= 5
+        findings.append((False, bi("profile.risk.single_crop", crop=crop_name(next(iter(crop_types))))))
+    facts = {
+        "acres": round(acres, 1),
+        "farms": len(farms),
+        "region": farmer.region,
+        "drought_prone": drought,
+        "irrigated": irrigated,
+        "estimated_kg_per_season": round(kg),
+        "estimated_value_tzs": round(value, -3),
+    }
+    return _criterion("farm", score, findings, facts)
+
+
+def _production(harvests: list[Harvest], receipts: list[WarehouseReceipt], storage_alerts: list[Alert]) -> dict[str, Any]:
+    """3. Harvest records across seasons and how consistent they are."""
+    if not harvests:
+        return _criterion("production", 20, [(False, bi("credit.prod.none"))], {"seasons": 0, "total_kg": 0})
+    per_season: dict[int, float] = {}
+    for h in harvests:
+        per_season[h.harvest_date.year] = per_season.get(h.harvest_date.year, 0) + h.quantity_kg
+    seasons = len(per_season)
+    total = sum(per_season.values())
+    findings: list[tuple[bool, dict[str, str]]] = []
+    variation = None
+    if seasons == 1:
+        score = 50.0
+        findings.append((False, bi("credit.prod.short", kg=round(total))))
+    else:
+        findings.append((True, bi("credit.prod.seasons", seasons=seasons, kg=round(total))))
+        mean = total / seasons
+        variation = (sum((a - mean) ** 2 for a in per_season.values()) / seasons) ** 0.5 / mean if mean else 1.0
+        score = 65.0 + (20 if variation < 0.25 else 5 if variation < 0.5 else -10)
+        findings.append((variation < 0.5, bi("credit.prod.consistent" if variation < 0.5 else "credit.prod.variable")))
+    if receipts:
+        if storage_alerts:
+            score -= 5 * min(3, len(storage_alerts))
+            findings.append((False, bi("profile.risk.storage_alerts", count=len(storage_alerts))))
+        else:
+            score += 10
+            findings.append((True, bi("profile.pos.receipts", count=len(receipts), kg=round(sum(r.quantity_kg for r in receipts)))))
+    facts = {
+        "seasons": seasons,
+        "total_kg": round(total),
+        "variation": round(variation, 2) if variation is not None else None,
+        "receipts": len(receipts),
+        "unresolved_storage_alerts": len(storage_alerts),
+    }
+    return _criterion("production", score, findings, facts)
+
+
+def _offtake(session: Session, farmer: Farmer, expected_kg: float | None) -> dict[str, Any]:
+    """4. Buyers who have agreed to buy the coming harvest: market certainty."""
+    from ..models import OffTakeContract
+
+    contracts = list(session.exec(select(OffTakeContract).where(OffTakeContract.farmer_id == farmer.id)))
+    this_month = _month_label(date.today())
+    active = [c for c in contracts if c.status == "ACCEPTED" and c.delivery_month >= this_month]
+    fulfilled = sum(1 for c in contracts if c.status == "FULFILLED")
+    kg = sum(c.quantity_kg for c in active)
+    value = sum(c.quantity_kg * c.price_per_kg for c in active)
+    coverage = min(1.0, kg / expected_kg) if expected_kg and kg else None
+    findings: list[tuple[bool, dict[str, str]]] = []
+    if not active:
+        score = 30.0
+        findings.append((False, bi("credit.off.none")))
+    else:
+        findings.append((True, bi("credit.off.active", count=len(active), buyers=len({c.buyer_id for c in active}), kg=round(kg), value=round(value))))
+        if coverage is None:
+            score = 70.0
+        else:
+            pct = round(coverage * 100)
+            score = 90.0 if coverage >= 0.5 else 75.0 if coverage >= 0.2 else 60.0
+            findings.append((coverage >= 0.2, bi("credit.off.coverage" if coverage >= 0.2 else "credit.off.low_coverage", pct=pct)))
+    if fulfilled:
+        score += min(10, 5 * fulfilled)
+        findings.append((True, bi("credit.off.fulfilled", count=fulfilled)))
+    facts = {
+        "active_contracts": len(active),
+        "contracted_kg": round(kg),
+        "contracted_value_tzs": round(value),
+        "coverage": round(coverage, 2) if coverage is not None else None,
+        "fulfilled": fulfilled,
+    }
+    return _criterion("offtake", score, findings, facts)
+
+
+def _condition(session: Session, farms: list[Farm], actionable: list[IrrigationAdvice], followed: int) -> dict[str, Any]:
+    """5. Soil moisture, pH, temperature and salinity from IoT sensors or AI estimates,
+    plus whether the farmer acts on the AI irrigation advice."""
+    from ..models import Sensor, SensorReading
+    from .farm_setup import estimate_salinity
+
+    if not farms:
+        return _criterion("condition", 30, [(False, bi("credit.cond.no_data"))], {})
+    farm = max(farms, key=lambda f: f.acreage)
+    sensors = {s.id: s for s in session.exec(select(Sensor).where(Sensor.farm_id.in_([f.id for f in farms])))}  # type: ignore[union-attr]
+
+    def latest(metric: str) -> tuple[float, str] | None:
+        if not sensors:
+            return None
+        r = session.exec(
+            select(SensorReading)
+            .where(SensorReading.sensor_id.in_(list(sensors)), SensorReading.metric == metric)  # type: ignore[union-attr]
+            .order_by(SensorReading.ts.desc())  # type: ignore[attr-defined]
+        ).first()
+        if not r:
+            return None
+        estimated = r.quality_flag == "ESTIMATE" or sensors[r.sensor_id].device_id.startswith("AI-")
+        return r.value, "estimate" if estimated else "sensor"
+
+    def src(kind: str) -> dict[str, str]:
+        return bi(f"credit.src.{kind}")
+
+    checks: list[float] = []
+    findings: list[tuple[bool, dict[str, str]]] = []
+    facts: dict[str, Any] = {}
+    if reading := latest("soil_moisture_pct"):
+        value, kind = reading
+        ok = MOISTURE_OK[0] <= value <= MOISTURE_OK[1]
+        checks.append(100 if ok else 50)
+        key = "moisture_ok" if ok else "moisture_low" if value < MOISTURE_OK[0] else "moisture_high"
+        findings.append((ok, bi(f"credit.cond.{key}", value=round(value, 1), source=src(kind))))
+        facts["soil_moisture_pct"] = {"value": round(value, 1), "source": kind}
+    if farm.soil_ph is not None:
+        ok = PH_OK[0] <= farm.soil_ph <= PH_OK[1]
+        checks.append(100 if ok else 40)
+        findings.append((ok, bi("credit.cond.ph_ok" if ok else "credit.cond.ph_bad", value=round(farm.soil_ph, 1))))
+        facts["soil_ph"] = {"value": farm.soil_ph, "source": farm.soil_source or "farmer"}
+    if reading := latest("soil_temperature_c"):
+        value, kind = reading
+        ok = SOIL_TEMP_OK[0] <= value <= SOIL_TEMP_OK[1]
+        checks.append(100 if ok else 50)
+        findings.append((ok, bi("credit.cond.temp_ok" if ok else "credit.cond.temp_bad", value=round(value, 1), source=src(kind))))
+        facts["soil_temperature_c"] = {"value": round(value, 1), "source": kind}
+    # Salinity: a real EC sensor reading wins; otherwise the AI location/soil estimate.
+    measured = latest("soil_ec_ds_m")
+    if measured:
+        ec, kind = measured
+    else:
+        ec, kind = estimate_salinity(farm.lat, farm.lon, farm.region, farm.soil_type, farm.irrigation_type)["ec_ds_m"], "estimate"
+    key = "salinity_ok" if ec < 2 else "salinity_mid" if ec <= 4 else "salinity_high"
+    checks.append(100 if ec < 2 else 60 if ec <= 4 else 20)
+    findings.append((ec < 2, bi(f"credit.cond.{key}", value=round(ec, 1), source=src(kind))))
+    facts["salinity_ec_ds_m"] = {"value": round(ec, 1), "source": kind}
+    if len(actionable) >= 3:
+        rate = followed / len(actionable)
+        checks.append(100 if rate >= 0.8 else 60 if rate >= 0.5 else 20)
+        findings.append((rate >= 0.5, bi("profile.pos.adherence" if rate >= 0.5 else "profile.risk.adherence_low", followed=followed, total=len(actionable))))
+        facts["advice_followed"] = {"followed": followed, "total": len(actionable)}
+    score = sum(checks) / len(checks) if checks else 50.0
+    return _criterion("condition", score, findings, facts)
+
+
 def build_profile(session: Session, farmer: Farmer) -> FarmerRiskProfile:
+    """Credit assessment on five criteria: transaction history, farm size and location,
+    production history, off-take contracts and farm condition (IoT/AI)."""
     farms = list(session.exec(select(Farm).where(Farm.farmer_id == farmer.id)))
     farm_ids = [f.id for f in farms]
     crops = list(session.exec(select(Crop).where(Crop.farm_id.in_(farm_ids)))) if farm_ids else []  # type: ignore[union-attr]
@@ -91,72 +335,35 @@ def build_profile(session: Session, farmer: Farmer) -> FarmerRiskProfile:
         )
     )
 
-    score = 50.0
-    positive: list[dict[str, str]] = []
-    risks: list[dict[str, str]] = []
+    kg_sold = sum(s.quantity_kg for s in sales)
+    sold_price = (sum(s.amount for s in sales) / kg_sold) if kg_sold else None
 
-    if len(actionable) >= 3:
-        rate = followed / len(actionable)
-        if rate >= 0.8:
-            score += 15
-            positive.append(bi("profile.pos.adherence", followed=followed, total=len(actionable)))
-        elif rate < 0.5:
-            score -= 10
-            risks.append(bi("profile.risk.adherence_low", followed=followed, total=len(actionable)))
-        else:
-            score += 5
-            positive.append(bi("profile.pos.adherence", followed=followed, total=len(actionable)))
-
-    if receipts:
-        if storage_alerts:
-            score -= 5 * min(3, len(storage_alerts))
-            risks.append(bi("profile.risk.storage_alerts", count=len(storage_alerts)))
-        else:
-            score += 10
-            positive.append(bi("profile.pos.storage_ok"))
-        score += 5
-        positive.append(bi("profile.pos.receipts", count=len(receipts), kg=round(sum(r.quantity_kg for r in receipts))))
-
-    buyers = {s.buyer_id for s in sales}
-    if sales:
-        score += min(20, 7 * len(sales)) + (5 if len(buyers) >= 2 else 0)
-        positive.append(bi("profile.pos.sales", sales=len(sales), buyers=len(buyers)))
-    else:
-        score -= 5
-        risks.append(bi("profile.risk.no_sales"))
-
-    if farmer.cooperative:
-        score += 5
-        positive.append(bi("profile.pos.cooperative", name=farmer.cooperative))
-
-    drought = farmer.region.strip().lower() in DROUGHT_PRONE_REGIONS
-    crop_types = {c.crop_type for c in crops}
-    if len(crop_types) == 1 and drought:
-        score -= 5
-        risks.append(bi("profile.risk.single_crop", crop=crop_name(next(iter(crop_types)))))
-    elif drought:
-        score -= 5
-        risks.append(bi("profile.risk.drought_region", region=farmer.region))
-
-    seasons = len({h.harvest_date.year for h in harvests})
-    if seasons <= 1:
-        score -= 5
-        risks.append(bi("profile.risk.short_history", seasons=max(seasons, 1) if harvests else 0))
-    else:
-        score += 5 * min(3, seasons - 1)
-        positive.append(bi("profile.pos.long_history", seasons=seasons))
-
-    score = max(0.0, min(100.0, score))
-    band = "LOW" if score >= 70 else "MEDIUM" if score >= 50 else "HIGH"
+    def price_for(crop: str) -> float:
+        return sold_price or DEFAULT_PRICE_TZS.get(crop, 750.0)
 
     flow = cash_flow(session, farmer, sales)
+    criteria = [
+        _transactions(session, farmer, sales),
+        _farm(farmer, farms, crops, price_for),
+        _production(harvests, receipts, storage_alerts),
+        _offtake(session, farmer, flow.get("expected_yield_kg")),
+        _condition(session, farms, actionable, followed),
+    ]
+    score = sum(c["score"] * c["weight"] for c in criteria) / sum(c["weight"] for c in criteria)
+    band = "LOW" if score >= 70 else "MEDIUM" if score >= 50 else "HIGH"
+    positive = [f["text"] for c in criteria for f in c["findings"] if f["good"]]
+    risks = [f["text"] for c in criteria for f in c["findings"] if not f["good"]]
+    drought = bool(criteria[1]["facts"].get("drought_prone"))
+
     products: list[dict[str, Any]] = []
     if flow.get("expected_income_range_tzs"):
         low = flow["expected_income_range_tzs"][0]
+        # A buyer contract for at least half the harvest makes repayment more certain.
+        share = 0.4 if (criteria[3]["facts"].get("coverage") or 0) >= 0.5 else 0.3
         products.append(
             {
                 "type": "input_loan",
-                "max_amount_tzs": round(low * 0.3, -3),
+                "max_amount_tzs": round(low * share, -3),
                 "repayment_month": flow["next_harvest_month"],
                 "reason": bi("profile.product.input_loan", month=flow["next_harvest_month"]),
             }
@@ -180,14 +387,15 @@ def build_profile(session: Session, farmer: Farmer) -> FarmerRiskProfile:
         cash_flow=flow,
         suggested_products=products,
         inputs={
+            "criteria": criteria,
             "advice_actionable": len(actionable),
             "advice_followed": followed,
             "verified_sales": len(sales),
-            "distinct_buyers": len(buyers),
+            "distinct_buyers": len({s.buyer_id for s in sales}),
             "receipts": len(receipts),
             "unresolved_storage_alerts": len(storage_alerts),
-            "seasons": seasons,
-            "crop_types": sorted(crop_types),
+            "seasons": criteria[2]["facts"]["seasons"],
+            "crop_types": sorted({c.crop_type for c in crops}),
             "drought_prone_region": drought,
         },
     )
@@ -277,6 +485,7 @@ def profile_json(p: FarmerRiskProfile, farmer: Farmer, evidence: dict[str, Any] 
         "risk_factors": p.risk_factors,
         "cash_flow_estimate": p.cash_flow,
         "suggested_products": p.suggested_products,
+        "criteria": p.inputs.get("criteria", []),
         "inputs": p.inputs,
         "disclaimer": bi("profile.disclaimer"),
     }

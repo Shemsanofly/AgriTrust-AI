@@ -1,5 +1,5 @@
-import { Check, CloudRain, LocateFixed, Plus, Radio, Sparkles, Sun, CloudSun } from 'lucide-react'
-import { useEffect, useState, type FormEvent } from 'react'
+import { Check, CloudRain, LocateFixed, MapPin, Plus, Radio, Sparkles, Sun, CloudSun } from 'lucide-react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChartLegend, CHART, TimeSeriesChart, pivotReadings } from '../../components/Charts'
 import { cropIcon } from '../../components/crops'
@@ -43,6 +43,8 @@ type PlantingAdvice = {
   }
   model_version: string
 }
+
+type Place = { region: string | null; district: string | null; place: string | null; label: string | null; source: 'osm' | 'offline' }
 
 type FarmSetupPrediction = {
   soil_type: string
@@ -459,6 +461,10 @@ function AddFarmDialog({ open, onClose, onDone }: { open: boolean; onClose: () =
   const [prediction, setPrediction] = useState<FarmSetupPrediction | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [touched, setTouched] = useState(false)
+  const [place, setPlace] = useState<Place | null>(null)
+  const [locating, setLocating] = useState(false)
+  // The region we filled in last, so a new location can replace it but never a typed one.
+  const autoRegion = useRef<string | null>(null)
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value })
   const num = (v: string) => (v.trim() === '' ? null : Number(v.replace(',', '.')))
 
@@ -470,16 +476,47 @@ function AddFarmDialog({ open, onClose, onDone }: { open: boolean; onClose: () =
     ph: form.soil_ph && !(num(form.soil_ph)! >= 3 && num(form.soil_ph)! <= 10) ? t('validation.ph') : null,
   }
 
-  const useGps = () =>
-    navigator.geolocation?.getCurrentPosition(
-      (pos) => {
+  /** Looks up the place for the coordinates and fills Region, unless the farmer typed their own. */
+  const locate = async (latValue: string, lonValue: string): Promise<string | null> => {
+    const lat = num(latValue)
+    const lon = num(lonValue)
+    if (lat === null || lon === null || !Number.isFinite(lat) || !Number.isFinite(lon)) return null
+    setLocating(true)
+    try {
+      const found = await api<Place>(`/farms/locate?lat=${lat}&lon=${lon}`)
+      setPlace(found.label ? found : null)
+      if (found.region) {
+        setForm((f) => (!f.region.trim() || f.region === autoRegion.current ? { ...f, region: found.region! } : f))
+        autoRegion.current = found.region
+      }
+      return found.region
+    } catch {
+      setPlace(null)
+      return null
+    } finally {
+      setLocating(false)
+    }
+  }
+
+  const useGps = () => {
+    if (!navigator.geolocation) return setError(t('farm.gpsFailed'))
+    setLocating(true)
+    setError(null)
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
         const lat = pos.coords.latitude.toFixed(5)
         const lon = pos.coords.longitude.toFixed(5)
         setForm((f) => ({ ...f, lat, lon }))
-        void predictSetup(lat, lon, form.region)
+        const region = await locate(lat, lon)
+        void predictSetup(lat, lon, region ?? form.region)
       },
-      () => setError(t('farm.gpsFailed')),
+      () => {
+        setLocating(false)
+        setError(t('farm.gpsFailed'))
+      },
+      { enableHighAccuracy: true, timeout: 15000 },
     )
+  }
 
   const applyPrediction = (next: FarmSetupPrediction) => {
     setForm((f) => ({
@@ -548,6 +585,8 @@ function AddFarmDialog({ open, onClose, onDone }: { open: boolean; onClose: () =
         },
       })
       setForm(blank)
+      setPlace(null)
+      autoRegion.current = null
       setPrediction(null)
       setTouched(false)
       toast(t('farm.added'))
@@ -597,11 +636,29 @@ function AddFarmDialog({ open, onClose, onDone }: { open: boolean; onClose: () =
         <Field label={t('auth.region')} error={show('region')}>
           <input className="input" value={form.region} onChange={set('region')} aria-invalid={Boolean(show('region'))} />
         </Field>
-        <Field label={t('farm.location')} error={show('location')}>
+        <Field
+          label={t('farm.location')}
+          error={show('location')}
+          hint={
+            locating ? (
+              t('farm.findingPlace')
+            ) : place ? (
+              <span className="inline-flex items-start gap-1 text-ink-soft">
+                <MapPin className="mt-px size-3.5 shrink-0 text-forest-700" aria-hidden />
+                <span>
+                  {place.label}
+                  {place.source === 'offline' && <span className="text-muted"> · {t('farm.nearestRegion')}</span>}
+                </span>
+              </span>
+            ) : (
+              t('farm.gpsHint')
+            )
+          }
+        >
           <div className="flex gap-2">
-            <input className="input" placeholder={t('farm.lat')} value={form.lat} onChange={set('lat')} inputMode="decimal" />
-            <input className="input" placeholder={t('farm.lon')} value={form.lon} onChange={set('lon')} inputMode="decimal" />
-            <Button variant="secondary" icon={LocateFixed} onClick={useGps} aria-label={t('farm.useGps')} className="shrink-0 px-3" />
+            <input className="input" placeholder={t('farm.lat')} value={form.lat} onChange={set('lat')} onBlur={() => void locate(form.lat, form.lon)} inputMode="decimal" aria-label={t('farm.lat')} />
+            <input className="input" placeholder={t('farm.lon')} value={form.lon} onChange={set('lon')} onBlur={() => void locate(form.lat, form.lon)} inputMode="decimal" aria-label={t('farm.lon')} />
+            <Button variant="secondary" icon={LocateFixed} busy={locating} onClick={useGps} aria-label={t('farm.useGps')} title={t('farm.useGps')} className="shrink-0 px-3" />
           </div>
         </Field>
         <Field label={`${t('farm.acreage')} (${t('farm.acres')})`} error={show('acreage')}>

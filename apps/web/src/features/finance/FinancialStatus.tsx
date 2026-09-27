@@ -1,9 +1,9 @@
 import { AlertTriangle, CheckCircle2, ChevronRight, HandCoins, PiggyBank, ShieldCheck, TrendingUp, Umbrella, type LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button, Card, cx } from '../../components/ui'
-import { useApi, useBi, useFormat } from '../../lib/hooks'
+import { useApi, useFormat } from '../../lib/hooks'
 import { ContestProfile } from './FinanceTabs'
-import { ProfileView, type Profile } from './ProfileView'
+import { CreditCriteria, ProfileView, type Profile } from './ProfileView'
 
 type Loan = { amount: number; status: string }
 type Goal = { saved_amount: number }
@@ -39,7 +39,6 @@ export type FinanceTab = 'loans' | 'savings' | 'insurance' | 'sharing'
 /** One-screen summary of the farmer's money: health, earnings, loans, savings and insurance. */
 export function FinancialStatus({ profile, onOpen }: { profile: Profile; onOpen: (tab: FinanceTab) => void }) {
   const { t } = useTranslation()
-  const bi = useBi()
   const f = useFormat()
   const { data: loans } = useApi<Loan[]>('/loans')
   const { data: goals } = useApi<Goal[]>('/savings/goals')
@@ -127,10 +126,7 @@ export function FinancialStatus({ profile, onOpen }: { profile: Profile; onOpen:
         />
       </div>
 
-      <div className="grid gap-5 md:grid-cols-2">
-        <Reasons title={t('finance.status.helping')} items={profile.positive_factors.slice(0, 3).map((x) => bi(x))} kind="good" />
-        <Reasons title={t('finance.status.improve')} items={profile.risk_factors.slice(0, 3).map((x) => bi(x))} kind="risk" />
-      </div>
+      <CreditCriteria criteria={profile.criteria} />
 
       <details className="group rounded-(--radius-card) border border-line bg-surface">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3.5 text-sm font-medium sm:px-5">
@@ -138,7 +134,7 @@ export function FinancialStatus({ profile, onOpen }: { profile: Profile; onOpen:
           <ChevronRight className="size-4 text-muted transition-transform group-open:rotate-90" aria-hidden />
         </summary>
         <div className="space-y-5 border-t border-line p-4 sm:p-5">
-          <ProfileView profile={profile} />
+          <ProfileView profile={profile} showCriteria={false} />
           <ContestProfile />
         </div>
       </details>
@@ -179,26 +175,5 @@ function Tile({ icon: Icon, label, value, sub, tone, action, onClick }: { icon: 
     </button>
   ) : (
     <div className={box}>{body}</div>
-  )
-}
-
-function Reasons({ title, items, kind }: { title: string; items: string[]; kind: 'good' | 'risk' }) {
-  const { t } = useTranslation()
-  const Icon = kind === 'good' ? CheckCircle2 : AlertTriangle
-  return (
-    <Card title={title}>
-      {items.length ? (
-        <ul className="space-y-2">
-          {items.map((text, i) => (
-            <li key={i} className="flex gap-2 text-sm">
-              <Icon className={cx('mt-0.5 size-4 shrink-0', kind === 'good' ? 'text-forest-700' : 'text-warn-700')} aria-hidden />
-              <span>{text}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-sm text-muted">{t('profile.none')}</p>
-      )}
-    </Card>
   )
 }

@@ -165,6 +165,26 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "New order from {buyer}: {qty} kg of {batch} at {price} TZS/kg",
         "sw": "Oda mpya kutoka {buyer}: kg {qty} za {batch} kwa TZS {price}/kg",
     },
+    "alert.contract_offered": {
+        "en": "{buyer} offers to buy {qty} kg of {crop} at {price} TZS/kg, delivery {month}",
+        "sw": "{buyer} anataka kununua kg {qty} za {crop} kwa TZS {price}/kg, kupelekwa {month}",
+    },
+    "alert.contract_accepted": {
+        "en": "{farmer} accepted your contract #{contract} for {qty} kg of {crop}",
+        "sw": "{farmer} amekubali mkataba wako #{contract} wa kg {qty} za {crop}",
+    },
+    "alert.contract_declined": {
+        "en": "{farmer} declined your contract #{contract} for {qty} kg of {crop}",
+        "sw": "{farmer} amekataa mkataba wako #{contract} wa kg {qty} za {crop}",
+    },
+    "alert.contract_cancelled": {
+        "en": "{buyer} withdrew the contract offer #{contract}",
+        "sw": "{buyer} ameondoa ofa ya mkataba #{contract}",
+    },
+    "alert.contract_fulfilled": {
+        "en": "Contract #{contract} with {buyer} is marked delivered",
+        "sw": "Mkataba #{contract} na {buyer} umewekwa kuwa umetekelezwa",
+    },
     "alert.order_status": {
         "en": "Order #{order} is now {status}",
         "sw": "Oda #{order} sasa iko katika hali: {status}",
@@ -245,7 +265,7 @@ MESSAGES: dict[str, dict[str, str]] = {
         "sw": "Bado hakuna mauzo yaliyothibitishwa",
     },
     "profile.pos.receipts": {
-        "en": "{count} digital warehouse receipts for {kg} kg stored in a verified ghala",
+        "en": "Digital warehouse receipts: {count}, for {kg} kg stored in a verified ghala",
         "sw": "Stakabadhi {count} za ghala za kidijitali kwa kg {kg} zilizohifadhiwa katika ghala lililothibitishwa",
     },
     "profile.pos.cooperative": {
@@ -284,6 +304,128 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "Future: an active warehouse receipt could back a loan (needs a regulated receipt system)",
         "sw": "Baadaye: stakabadhi hai ya ghala inaweza kudhamini mkopo (inahitaji mfumo rasmi wa stakabadhi)",
     },
+    # --- credit assessment: the five criteria and their findings
+    "credit.c.transactions": {"en": "Transaction history", "sw": "Historia ya miamala"},
+    "credit.c.farm": {"en": "Farm size and location", "sw": "Ukubwa na eneo la shamba"},
+    "credit.c.production": {"en": "Production history", "sw": "Historia ya uzalishaji"},
+    "credit.c.offtake": {"en": "Off-take contracts", "sw": "Mikataba ya ununuzi wa mavuno"},
+    "credit.c.condition": {"en": "Farm condition (IoT/AI)", "sw": "Hali ya shamba (IoT/AI)"},
+    "credit.tx.sales": {
+        "en": "Verified sales: {sales} · {amount} TZS · buyers: {buyers}",
+        "sw": "Mauzo {sales} yaliyothibitishwa yenye thamani ya TZS {amount} kwa wanunuzi {buyers} tofauti",
+    },
+    "credit.tx.no_sales": {"en": "No verified sales yet", "sw": "Bado hakuna mauzo yaliyothibitishwa"},
+    "credit.tx.repaid": {"en": "Loans repaid in full: {count}", "sw": "Mikopo {count} imelipwa kikamilifu"},
+    "credit.tx.repaying": {"en": "Loans being repaid now: {count}", "sw": "Mikopo {count} inaendelea kulipwa"},
+    "credit.tx.savings": {
+        "en": "Savings: {amount} TZS (goals: {goals})",
+        "sw": "TZS {amount} zimewekwa akiba katika malengo {goals}",
+    },
+    "credit.tx.no_savings": {"en": "No savings recorded yet", "sw": "Bado hakuna akiba iliyorekodiwa"},
+    "credit.farm.size": {
+        "en": "Farm area: {acres} acres (farms: {farms}) · about {kg} kg a season, worth around {value} TZS",
+        "sw": "Ekari {acres} kwenye mashamba {farms}: takriban kg {kg} kwa msimu, zenye thamani ya karibu TZS {value}",
+    },
+    "credit.farm.small": {
+        "en": "Less than 1 acre limits how much the farm can produce",
+        "sw": "Chini ya ekari 1 hupunguza kiasi shamba linachoweza kuzalisha",
+    },
+    "credit.farm.no_farm": {"en": "No farm registered yet", "sw": "Bado hakuna shamba lililosajiliwa"},
+    "credit.farm.good_zone": {
+        "en": "{region} has no major climate risk for farming",
+        "sw": "{region} haina hatari kubwa ya hali ya hewa kwa kilimo",
+    },
+    "credit.farm.drought_irrigated": {
+        "en": "{region} is drought-prone, but irrigation reduces the risk",
+        "sw": "{region} ina hatari ya ukame, lakini umwagiliaji unapunguza hatari",
+    },
+    "credit.farm.drought_rainfed": {
+        "en": "{region} is drought-prone and the farm depends on rain",
+        "sw": "{region} ina hatari ya ukame na shamba linategemea mvua",
+    },
+    "credit.prod.none": {"en": "No harvests recorded yet", "sw": "Bado hakuna mavuno yaliyorekodiwa"},
+    "credit.prod.seasons": {
+        "en": "Seasons recorded: {seasons} · harvested in total: {kg} kg",
+        "sw": "Misimu {seasons} imerekodiwa, jumla ya kg {kg} zimevunwa",
+    },
+    "credit.prod.consistent": {
+        "en": "Harvests are steady from season to season",
+        "sw": "Mavuno ni thabiti msimu hadi msimu",
+    },
+    "credit.prod.variable": {
+        "en": "Harvests change a lot between seasons",
+        "sw": "Mavuno yanabadilika sana kati ya misimu",
+    },
+    "credit.prod.short": {
+        "en": "Only one season of records so far ({kg} kg harvested)",
+        "sw": "Rekodi za msimu mmoja tu hadi sasa (kg {kg} zimevunwa)",
+    },
+    "credit.off.none": {
+        "en": "No off-take contract with a buyer yet",
+        "sw": "Bado hakuna mkataba wa ununuzi na mnunuzi",
+    },
+    "credit.off.active": {
+        "en": "Accepted contracts: {count} (buyers: {buyers}) · {kg} kg worth {value} TZS",
+        "sw": "Mikataba {count} iliyokubaliwa na wanunuzi {buyers} kwa kg {kg}, yenye thamani ya TZS {value}",
+    },
+    "credit.off.coverage": {
+        "en": "Contracts cover {pct}% of the expected harvest",
+        "sw": "Mikataba inashughulikia {pct}% ya mavuno yanayotarajiwa",
+    },
+    "credit.off.low_coverage": {
+        "en": "Contracts cover only {pct}% of the expected harvest",
+        "sw": "Mikataba inashughulikia {pct}% tu ya mavuno yanayotarajiwa",
+    },
+    "credit.off.fulfilled": {
+        "en": "Earlier contracts delivered: {count}",
+        "sw": "Mikataba {count} ya awali imetekelezwa",
+    },
+    "credit.cond.moisture_ok": {
+        "en": "Soil moisture {value}% is in the healthy range ({source})",
+        "sw": "Unyevu wa udongo {value}% uko katika kiwango kizuri ({source})",
+    },
+    "credit.cond.moisture_low": {
+        "en": "Soil moisture {value}% is below the healthy range ({source})",
+        "sw": "Unyevu wa udongo {value}% uko chini ya kiwango kizuri ({source})",
+    },
+    "credit.cond.moisture_high": {
+        "en": "Soil moisture {value}% is above the healthy range ({source})",
+        "sw": "Unyevu wa udongo {value}% uko juu ya kiwango kizuri ({source})",
+    },
+    "credit.cond.ph_ok": {
+        "en": "Soil pH {value} suits most crops",
+        "sw": "pH ya udongo {value} inafaa mazao mengi",
+    },
+    "credit.cond.ph_bad": {
+        "en": "Soil pH {value} is outside the 5.5–7.5 range most crops need",
+        "sw": "pH ya udongo {value} iko nje ya kiwango cha 5.5–7.5 kinachohitajika na mazao mengi",
+    },
+    "credit.cond.temp_ok": {
+        "en": "Soil temperature {value}°C is suitable ({source})",
+        "sw": "Joto la udongo {value}°C linafaa ({source})",
+    },
+    "credit.cond.temp_bad": {
+        "en": "Soil temperature {value}°C stresses crops ({source})",
+        "sw": "Joto la udongo {value}°C linasumbua mazao ({source})",
+    },
+    "credit.cond.salinity_ok": {
+        "en": "Salinity {value} dS/m: not saline ({source})",
+        "sw": "Chumvi {value} dS/m: si udongo wa chumvi ({source})",
+    },
+    "credit.cond.salinity_mid": {
+        "en": "Salinity {value} dS/m: slightly saline, sensitive crops may suffer ({source})",
+        "sw": "Chumvi {value} dS/m: chumvi kidogo, mazao nyeti yanaweza kuathirika ({source})",
+    },
+    "credit.cond.salinity_high": {
+        "en": "Salinity {value} dS/m: saline soil lowers yields ({source})",
+        "sw": "Chumvi {value} dS/m: udongo wa chumvi hupunguza mavuno ({source})",
+    },
+    "credit.cond.no_data": {
+        "en": "No soil readings or estimates yet",
+        "sw": "Bado hakuna vipimo au makadirio ya udongo",
+    },
+    "credit.src.sensor": {"en": "sensor", "sw": "kihisi"},
+    "credit.src.estimate": {"en": "AI estimate", "sw": "makadirio ya AI"},
     "profile.disclaimer": {
         "en": "Decision support only. The lender makes and is accountable for the credit decision.",
         "sw": "Ni msaada wa kufanya uamuzi tu. Mkopeshaji ndiye anayefanya na kuwajibika kwa uamuzi wa mkopo.",

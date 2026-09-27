@@ -1,12 +1,13 @@
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
 from ..ai import farm_setup, irrigation, planting
 from ..db import get_session
+from ..integrations.geocode import reverse_geocode
 from ..integrations.open_meteo import get_forecast
 from ..models import Crop, Farm, Farmer, IrrigationAdvice, Role, Sensor, SensorReading, User, utcnow
 from ..security.audit import audit
@@ -176,6 +177,14 @@ def list_farms(user: User = Depends(require_roles(Role.FARMER)), session: Sessio
 def predict_farm_setup(body: FarmSetupPredictIn, _: User = Depends(require_roles(Role.FARMER))):
     """Suggest farm setup defaults from location. Farmers can override every field."""
     return farm_setup.predict_setup(body.lat, body.lon, body.region).__dict__
+
+
+@router.get("/farms/locate")
+def locate(
+    lat: float = Query(ge=-90, le=90), lon: float = Query(ge=-180, le=180), _: User = Depends(require_roles(Role.FARMER))
+):
+    """Place name (region, district, village) for GPS coordinates, to fill the farm form."""
+    return {"lat": lat, "lon": lon, **reverse_geocode(lat, lon)}
 
 
 @router.get("/farms/{farm_id}")

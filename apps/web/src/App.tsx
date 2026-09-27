@@ -21,6 +21,7 @@ const finance = () => import('./features/finance/FarmerFinancePage')
 const partners = () => import('./features/finance/PartnerPortals')
 const market = () => import('./features/marketplace/Marketplace')
 const buyer = () => import('./features/marketplace/BuyerPages')
+const contracts = () => import('./features/contracts/ContractsPages')
 const verify = () => import('./features/verify/VerifyPage')
 const admin = () => import('./features/admin/AdminPages')
 
@@ -52,6 +53,7 @@ const Marketplace = named(market, 'Marketplace')
 const ListingDetail = named(market, 'ListingDetail')
 const VerifiedBatchesPage = named(buyer, 'VerifiedBatchesPage')
 const SuppliersPage = named(buyer, 'SuppliersPage')
+const BuyerContractsPage = named(contracts, 'BuyerContractsPage')
 const PaymentsPage = named(buyer, 'PaymentsPage')
 const VerifyPage = named(verify, 'VerifyPage')
 const ScanPage = named(verify, 'ScanPage')
@@ -83,6 +85,7 @@ function roleRoutes(role: Role) {
           <Route index element={<Marketplace />} />
           <Route path="market/:batchId" element={<ListingDetail />} />
           <Route path="orders" element={<BuyerOrdersPage />} />
+          <Route path="contracts" element={<BuyerContractsPage />} />
           <Route path="verified" element={<VerifiedBatchesPage />} />
           <Route path="suppliers" element={<SuppliersPage />} />
           <Route path="payments" element={<PaymentsPage />} />

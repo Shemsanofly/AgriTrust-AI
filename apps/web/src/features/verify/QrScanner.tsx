@@ -1,5 +1,6 @@
-import { Camera, CameraOff, Search } from 'lucide-react'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { Camera, CameraOff, ImageUp, Search } from 'lucide-react'
+import QrScannerLib from 'qr-scanner'
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Button, Notice } from '../../components/ui'
@@ -10,90 +11,104 @@ export function idFromCode(raw: string): string | null {
   return m ? m[1].toUpperCase() : null
 }
 
-type Detector = { detect: (src: CanvasImageSource) => Promise<{ rawValue: string }[]> }
+type Status = 'idle' | 'insecure' | 'noCamera' | 'denied' | 'noQr' | 'notOurs'
 
-/** Camera QR scanning with the browser's built-in BarcodeDetector (no extra download on
- * a slow connection). Where it is not supported, typing the code always works. */
+/** QR scanning with nimiq/qr-scanner: uses the browser's BarcodeDetector where it exists and
+ * its own web-worker decoder elsewhere (iPhone Safari, Firefox). Browsers only open the camera
+ * on HTTPS or localhost, so a photo of the code and typing the code always work too. */
 export function QrScanner() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const videoRef = useRef<HTMLVideoElement>(null)
+  const photoRef = useRef<HTMLInputElement>(null)
   const [active, setActive] = useState(false)
-  const [status, setStatus] = useState<'idle' | 'unsupported' | 'denied'>('idle')
+  const [status, setStatus] = useState<Status>('idle')
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const supported = typeof window !== 'undefined' && 'BarcodeDetector' in window
+
+  const open = (raw: string) => {
+    const id = idFromCode(raw)
+    if (!id) return false
+    navigate(`/verify/${id}`)
+    return true
+  }
 
   useEffect(() => {
-    if (!active) return
-    let stream: MediaStream | null = null
-    let raf = 0
-    let stopped = false
-    const Ctor = (window as any).BarcodeDetector
-    const detector: Detector = new Ctor({ formats: ['qr_code'] })
-    navigator.mediaDevices
-      ?.getUserMedia({ video: { facingMode: 'environment' } })
-      .then((s) => {
-        stream = s
-        if (!videoRef.current) return
-        videoRef.current.srcObject = s
-        videoRef.current.play()
-        const tick = async () => {
-          if (stopped || !videoRef.current) return
-          try {
-            const found = await detector.detect(videoRef.current)
-            const id = found.map((f) => idFromCode(f.rawValue)).find(Boolean)
-            if (id) {
-              navigate(`/verify/${id}`)
-              return
-            }
-          } catch {
-            /* frame not ready */
-          }
-          raf = requestAnimationFrame(tick)
-        }
-        tick()
-      })
-      .catch(() => {
-        setStatus('denied')
-        setActive(false)
-      })
-    return () => {
-      stopped = true
-      cancelAnimationFrame(raf)
-      stream?.getTracks().forEach((tr) => tr.stop())
+    if (!active || !videoRef.current) return
+    let done = false
+    const scanner = new QrScannerLib(
+      videoRef.current,
+      (result) => {
+        if (done) return
+        if (open(result.data)) {
+          done = true
+          scanner.stop()
+        } else setStatus('notOurs')
+      },
+      { preferredCamera: 'environment', highlightScanRegion: true, highlightCodeOutline: true, maxScansPerSecond: 10 },
+    )
+    scanner.start().catch((err) => {
+      const text = String(err?.name ?? err)
+      setStatus(/NotAllowed|Permission/i.test(text) ? 'denied' : 'noCamera')
+      setActive(false)
+    })
+    return () => scanner.destroy()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active])
+
+  const startCamera = () => {
+    if (!window.isSecureContext || !navigator.mediaDevices) return setStatus('insecure')
+    setStatus('idle')
+    setActive(true)
+  }
+
+  const scanPhoto = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setStatus('idle')
+    try {
+      const result = await QrScannerLib.scanImage(file, { returnDetailedScanResult: true })
+      if (!open(result.data)) setStatus('notOurs')
+    } catch {
+      setStatus('noQr')
     }
-  }, [active, navigate])
+  }
 
   const lookup = (e: FormEvent) => {
     e.preventDefault()
-    const id = idFromCode(code)
-    if (!id) return setError(t('verify.badCode'))
-    navigate(`/verify/${id}`)
+    if (!open(code)) setError(t('verify.badCode'))
   }
+
+  const notice = {
+    insecure: ['neutral', t('verify.cameraNeedsHttps')],
+    noCamera: ['neutral', t('verify.noCamera')],
+    denied: ['warning', t('verify.cameraDenied')],
+    noQr: ['warning', t('verify.noQrInPhoto')],
+    notOurs: ['warning', t('verify.badCode')],
+  } as const
 
   return (
     <div className="space-y-4">
       {active ? (
         <div className="relative overflow-hidden rounded-md bg-forest-950">
           <video ref={videoRef} className="aspect-square w-full object-cover sm:aspect-video" muted playsInline />
-          <div className="pointer-events-none absolute inset-[18%] rounded-lg border-2 border-white/80" aria-hidden />
-          <Button variant="secondary" size="sm" icon={CameraOff} className="absolute right-3 bottom-3" onClick={() => setActive(false)}>
+          <Button variant="secondary" size="sm" icon={CameraOff} className="absolute right-3 bottom-3 z-10" onClick={() => setActive(false)}>
             {t('verify.stopCamera')}
           </Button>
         </div>
       ) : (
-        <Button
-          icon={Camera}
-          size="lg"
-          className="w-full"
-          onClick={() => (supported ? (setStatus('idle'), setActive(true)) : setStatus('unsupported'))}
-        >
-          {t('verify.scanQr')}
-        </Button>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Button icon={Camera} size="lg" onClick={startCamera}>
+            {t('verify.scanQr')}
+          </Button>
+          <Button icon={ImageUp} size="lg" variant="secondary" onClick={() => photoRef.current?.click()}>
+            {t('verify.scanPhoto')}
+          </Button>
+        </div>
       )}
-      {status === 'unsupported' && <Notice tone="neutral">{t('verify.scanUnsupported')}</Notice>}
-      {status === 'denied' && <Notice tone="warning">{t('verify.cameraDenied')}</Notice>}
+      <input ref={photoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={scanPhoto} />
+      {status !== 'idle' && <Notice tone={notice[status][0]}>{notice[status][1]}</Notice>}
       <form onSubmit={lookup} className="flex gap-2">
         <label className="relative min-w-0 flex-1">
           <span className="sr-only">{t('verify.enterCode')}</span>

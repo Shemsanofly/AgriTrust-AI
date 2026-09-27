@@ -1,7 +1,17 @@
-import { AlertTriangle, CheckCircle2, CloudSun, Scale, ShoppingBasket, Warehouse, Wheat } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ChevronRight, CloudSun, FileSignature, Gauge, Receipt, Scale, ShoppingBasket, Sprout, Warehouse, Wheat, type LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Badge, Card, KeyValues, Notice, RiskBadge, RiskScale, cx } from '../../components/ui'
 import { useBi, useFormat, type Bi } from '../../lib/hooks'
+
+export type Criterion = {
+  key: 'transactions' | 'farm' | 'production' | 'offtake' | 'condition'
+  title: Bi
+  weight: number
+  score: number
+  level: 'good' | 'fair' | 'weak'
+  findings: { good: boolean; text: Bi }[]
+  facts: Record<string, any>
+}
 
 export type Profile = {
   farmer_id: string
@@ -21,6 +31,7 @@ export type Profile = {
     price_source?: string
     monthly?: { month: string; income_tzs: [number, number] }[]
   }
+  criteria: Criterion[]
   suggested_products: { type: string; reason: Bi; max_amount_tzs?: number; repayment_month?: string; status?: string }[]
   inputs: Record<string, any>
   disclaimer: Bi
@@ -47,7 +58,7 @@ const monthLabel = (ym: string, locale: string) => new Date(`${ym}-01T00:00:00`)
 
 /** Explainable farmer profile. The level is always shown with the factors and the
  * verified records behind them, and with who decides (a person, not the model). */
-export function ProfileView({ profile, audience = 'farmer' }: { profile: Profile; audience?: 'farmer' | 'partner' }) {
+export function ProfileView({ profile, audience = 'farmer', showCriteria = true }: { profile: Profile; audience?: 'farmer' | 'partner'; showCriteria?: boolean }) {
   const { t } = useTranslation()
   const bi = useBi()
   const f = useFormat()
@@ -82,6 +93,8 @@ export function ProfileView({ profile, audience = 'farmer' }: { profile: Profile
           {bi(profile.disclaimer)} {audience === 'farmer' && t('profile.youControl')}
         </Notice>
       </Card>
+
+      {showCriteria && <CreditCriteria criteria={profile.criteria} />}
 
       {ev && (
         <div className="grid gap-5 lg:grid-cols-2">
@@ -213,5 +226,73 @@ function FactorList({ title, items, kind }: { title: string; items: string[]; ki
         <p className="mt-2 text-[13px] text-muted">{t('profile.none')}</p>
       )}
     </div>
+  )
+}
+
+const CRITERION_ICON: Record<Criterion['key'], LucideIcon> = {
+  transactions: Receipt,
+  farm: Sprout,
+  production: Wheat,
+  offtake: FileSignature,
+  condition: Gauge,
+}
+const LEVEL_STYLE = {
+  good: { bar: 'bg-forest-700', tone: 'green' },
+  fair: { bar: 'bg-harvest-500', tone: 'gold' },
+  weak: { bar: 'bg-warn-700', tone: 'amber' },
+} as const
+
+/** The five criteria behind the credit assessment, each with its weight, score and the
+ * findings that produced it. Tap a row to see the reasons. */
+export function CreditCriteria({ criteria, open }: { criteria: Criterion[]; open?: boolean }) {
+  const { t } = useTranslation()
+  const bi = useBi()
+  if (!criteria?.length) return null
+  return (
+    <Card title={t('credit.title')} subtitle={t('credit.subtitle')}>
+      <ul className="-my-1 divide-y divide-line">
+        {criteria.map((c) => {
+          const Icon = CRITERION_ICON[c.key]
+          const style = LEVEL_STYLE[c.level]
+          return (
+            <li key={c.key}>
+              <details className="group py-3" open={open}>
+                <summary className="flex cursor-pointer list-none items-center gap-3">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-sunken text-ink-soft">
+                    <Icon className="size-4" aria-hidden />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="text-sm font-semibold">{bi(c.title)}</span>
+                      <span className="text-xs text-muted">{t('credit.weight', { pct: c.weight })}</span>
+                    </div>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-line" role="img" aria-label={`${bi(c.title)}: ${c.score}/100`}>
+                        <div className={cx('h-full rounded-full', style.bar)} style={{ width: `${c.score}%` }} />
+                      </div>
+                      <span className="num w-8 text-right text-xs font-semibold">{c.score}</span>
+                    </div>
+                  </div>
+                  <Badge tone={style.tone}>{t(`credit.level.${c.level}`)}</Badge>
+                  <ChevronRight className="size-4 shrink-0 text-muted transition-transform group-open:rotate-90" aria-hidden />
+                </summary>
+                <ul className="mt-3 space-y-1.5 pl-12">
+                  {c.findings.map((finding, i) => (
+                    <li key={i} className="flex gap-2 text-[13px] text-ink-soft">
+                      {finding.good ? (
+                        <CheckCircle2 className="mt-px size-4 shrink-0 text-forest-700" aria-hidden />
+                      ) : (
+                        <AlertTriangle className="mt-px size-4 shrink-0 text-warn-700" aria-hidden />
+                      )}
+                      <span>{bi(finding.text)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            </li>
+          )
+        })}
+      </ul>
+    </Card>
   )
 }

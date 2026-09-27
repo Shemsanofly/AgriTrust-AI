@@ -21,6 +21,7 @@ from .models import (
     Harvest,
     IrrigationAdvice,
     Language,
+    OffTakeContract,
     Order,
     Role,
     Sale,
@@ -130,6 +131,22 @@ def seed() -> None:
         s.flush()
         _readings(s, soil, 48, 30, lambda i, n: {"soil_moisture_pct": 33 - 2 * i / n + 0.5 * math.sin(i / 3), "soil_temperature_c": 24 + 3 * math.sin(i / 8)})
         _readings(s, ghala, 72, 60, lambda i, n: {"temperature_c": 24.5 + 1.2 * math.sin(i / 4), "humidity_pct": 59 + 2 * math.sin(i / 5)})
+
+        # Off-take: one buyer has contracted part of the coming maize harvest; another offer waits.
+        delivery = growing.expected_harvest_date.strftime("%Y-%m")
+        s.add_all(
+            [
+                OffTakeContract(
+                    buyer_id=buyer1.id, farmer_id=neema.id, crop_type="maize", quantity_kg=1500, price_per_kg=800,
+                    delivery_month=delivery, status="ACCEPTED", note="Grade A, delivered to Ghala la Chamwino",
+                    decided_at=utcnow() - timedelta(days=10),
+                ),
+                OffTakeContract(
+                    buyer_id=buyer2.id, farmer_id=neema.id, crop_type="maize", quantity_kg=800, price_per_kg=780,
+                    delivery_month=delivery, note="Price fixed now; we collect from the farm",
+                ),
+            ]
+        )
 
         # Season history: 20 irrigation recommendations, 18 followed.
         for i in range(20):

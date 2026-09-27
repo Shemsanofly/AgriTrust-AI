@@ -54,7 +54,8 @@
     "audit": "Audit log",
     "users": "Users",
     "sms": "SMS log",
-    "demoTools": "Demo tools"
+    "demoTools": "Demo tools",
+    "contracts": "Contracts"
   },
   "roles": {
     "FARMER": "Farmer",
@@ -112,7 +113,6 @@
     "businessName": "Business name",
     "country": "Country",
     "continue": "Continue",
-    "languageSaved": "We'll use the language you're using now for the app and SMS. You can change it any time.",
     "otpTitle": "Confirm your phone",
     "otpSent": "Enter the 6-digit code we sent to {{phone}}.",
     "devOtp": "Demo: your code is {{code}}",
@@ -123,7 +123,8 @@
     "securityNote": "Never share your PIN or SMS code, not even with an extension officer.",
     "demoAccounts": "Demo accounts",
     "demoHint": "Tap one to fill in the phone and PIN (1234).",
-    "photoCredit": "Maize farm, Tanzania · Photo: Evancez, CC BY-SA 4.0"
+    "photoCredit": "Maize farm, Tanzania · Photo: Evancez, CC BY-SA 4.0",
+    "countryCode": "Country code"
   },
   "security": {
     "title": "Security",
@@ -158,7 +159,8 @@
     "method": {
       "pin": "PIN",
       "otp": "SMS code",
-      "biometric": "Fingerprint / face"
+      "biometric": "Fingerprint / face",
+      "face": "Face ID"
     },
     "newDeviceTitle": "New device",
     "newDeviceBody": "This is the first sign-in from this device. We sent you an SMS about it.",
@@ -271,7 +273,9 @@
     "FILED": "Filed",
     "EVIDENCE_ATTACHED": "Evidence attached",
     "EXPIRED": "Expired",
-    "REVOKED": "Revoked"
+    "REVOKED": "Revoked",
+    "OFFERED": "Offered",
+    "FULFILLED": "Delivered"
   },
   "demo": {
     "controls": "Demo controls",
@@ -381,7 +385,10 @@
       "low": "Low",
       "medium": "Medium",
       "high": "High"
-    }
+    },
+    "findingPlace": "Finding the place…",
+    "nearestRegion": "nearest region (offline)",
+    "gpsHint": "Tap the location button while standing on the farm: the place and region fill in automatically."
   },
   "ghala": {
     "farmerTitle": "Ghala",
@@ -1027,7 +1034,6 @@
     "scanSubtitle": "Scan the QR on a bag or receipt, or type the code.",
     "scanQr": "Scan QR code",
     "stopCamera": "Stop",
-    "scanUnsupported": "This browser can't scan. Type the code printed under the QR instead.",
     "cameraDenied": "Camera permission was refused. Type the code instead.",
     "enterCode": "Batch, receipt or sale code",
     "check": "Check",
@@ -1035,7 +1041,11 @@
     "buyerSubtitle": "Check any batch's journey before and after you buy.",
     "yourBatches": "Batches you've ordered",
     "noBatchesYet": "You haven't ordered any batches yet.",
-    "inMarket": "In the marketplace now"
+    "inMarket": "In the marketplace now",
+    "scanPhoto": "Scan from photo",
+    "cameraNeedsHttps": "The live camera only works on a secure (https) link. Tap \"Scan from photo\" to take a picture of the QR, or type the code.",
+    "noCamera": "No camera was found. Tap \"Scan from photo\" or type the code.",
+    "noQrInPhoto": "No QR code found in that photo. Hold the phone steady, fill the frame with the QR and try again."
   },
   "payments": {
     "subtitle": "Payments for your orders.",
@@ -1144,7 +1154,7 @@
     "needs_warehouse_receipt": "Only stock with a ghala receipt can be sold.",
     "price_required": "Set a price first.",
     "insufficient_quantity": "Not enough stock available.",
-    "invalid_transition": "That step isn't possible right now.",
+    "invalid_transition": "This contract has already changed. Refresh and try again.",
     "no_receipt": "This batch has no ghala receipt.",
     "batch_already_stored": "This batch is already in a ghala.",
     "warehouse_not_verified": "This ghala isn't verified.",
@@ -1164,6 +1174,100 @@
     "invalid_stage": "Invalid crop stage.",
     "no_passkey": "Fingerprint sign-in isn't set up for this number.",
     "biometric_failed": "The fingerprint or face check failed. Use your PIN.",
-    "biometric_expired": "That took too long. Try again."
+    "biometric_expired": "That took too long. Try again.",
+    "face_in_use": "This face is already set up on another account.",
+    "face_not_recognised": "We couldn't recognise this face. Try again or use your PIN.",
+    "face_unavailable": "Face ID can't be checked right now. Use your PIN.",
+    "face_disabled": "Face ID is not available.",
+    "delivery_in_past": "The delivery month is in the past."
+  },
+  "face": {
+    "title": "Face ID",
+    "signIn": "Sign in with Face ID",
+    "setupTitle": "Add Face ID",
+    "setupSubtitle": "Optional: next time, sign in by looking at your camera instead of typing your PIN.",
+    "setup": "Set up Face ID",
+    "skip": "Skip for now",
+    "on": "Face ID is on",
+    "removed": "Face ID removed",
+    "privacy": "Face ID is provided by FACEIO. They keep a face template to recognise you; this app keeps only a random ID, never your photo. Your PIN always works, and you can remove Face ID any time in Profile & security.",
+    "tips": {
+      "light": "Face a light, not a window behind you.",
+      "still": "Hold the phone at eye level and keep still for a few seconds.",
+      "alone": "Only your face should be in the camera."
+    },
+    "err": {
+      "camera": "Camera permission was refused. Allow the camera and try again.",
+      "noFace": "No clear face found. Move into better light, with only your face in view.",
+      "unknown": "We couldn't recognise this face. Try again or use your PIN.",
+      "notLinked": "This face is not linked to an account yet. Sign in with your PIN, then add Face ID in Profile & security.",
+      "duplicate": "This face is already set up on another account.",
+      "timeout": "That took too long. Try again.",
+      "offline": "Face ID needs an internet connection. Try again or use your PIN.",
+      "setup": "Face ID isn't set up for this web address yet. Use your PIN for now.",
+      "cancelled": "Face ID was cancelled.",
+      "failed": "Face ID didn't work this time. Try again or use your PIN."
+    }
+  },
+  "credit": {
+    "title": "How your loan assessment is worked out",
+    "subtitle": "Five criteria, each scored out of 100. Tap one to see the reasons.",
+    "weight": "{{pct}}% of the score",
+    "level": {
+      "good": "Strong",
+      "fair": "Fair",
+      "weak": "Weak"
+    }
+  },
+  "contracts": {
+    "title": "Contracts",
+    "buyerSubtitle": "Agree now to buy part of a farmer's coming harvest at a fixed price. It gives farmers a sure market and helps them get loans.",
+    "farmerNote": "A contract is a buyer's promise to buy part of your coming harvest at a fixed price. Accepted contracts strengthen your loan assessment.",
+    "offer": "Offer a contract",
+    "offerTitle": "Offer a contract",
+    "farmer": "Farmer",
+    "buyer": "Buyer",
+    "chooseFarmer": "Choose a farmer",
+    "pickFarmer": "Choose a farmer first.",
+    "pickMonth": "Choose a delivery month from this month on.",
+    "growing": "Growing: {{crops}}",
+    "notGrowing": "No crop in the ground right now",
+    "nextHarvest": "next harvest {{date}}",
+    "crop": "Crop",
+    "quantity": "Quantity (kg)",
+    "price": "Price",
+    "pricePerKg": "Price per kg (TZS)",
+    "total": "Total value",
+    "totalValue": "Total value: {{value}}",
+    "delivery": "Delivery month",
+    "deliveryIn": "delivery {{month}}",
+    "note": "Note to the farmer",
+    "notePlaceholder": "Quality, where to deliver, how you will pay…",
+    "send": "Send offer",
+    "sent": "Offer sent to {{name}}",
+    "verifiedBuyer": "Verified buyer",
+    "accept": "Accept",
+    "decline": "Decline",
+    "withdraw": "Withdraw offer",
+    "markDelivered": "Mark delivered",
+    "acceptNote": "By accepting, you agree to deliver this quantity in that month at this price. Lenders can see accepted contracts when you share your record.",
+    "activeSummary_one": "{{count}} active contract · {{kg}} · {{value}}",
+    "activeSummary_other": "{{count}} active contracts · {{kg}} · {{value}}",
+    "noneFarmer": "No contract offers yet",
+    "noneFarmerBody": "When a buyer offers to buy your coming harvest, it appears here.",
+    "noneBuyer": "No contracts yet",
+    "noneBuyerBody": "Offer a contract to secure supply from a farmer's next harvest.",
+    "confirm": {
+      "accept": "Accept this contract?",
+      "decline": "Decline this offer?",
+      "cancel": "Withdraw this offer?",
+      "fulfil": "Mark this contract delivered?"
+    },
+    "done": {
+      "accept": "Contract accepted",
+      "decline": "Offer declined",
+      "cancel": "Offer withdrawn",
+      "fulfil": "Contract marked delivered"
+    }
   }
 }

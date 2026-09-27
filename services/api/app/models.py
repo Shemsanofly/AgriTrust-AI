@@ -75,6 +75,17 @@ class WebAuthnCredential(SQLModel, table=True):
     last_used_at: Optional[datetime] = None
 
 
+class FaceLogin(SQLModel, table=True):
+    """Face sign-in through FACEIO. FACEIO keeps the face template; this app keeps only a
+    keyed hash of the Facial ID it returns, so a leaked database cannot be replayed."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True, unique=True)
+    facial_id_hash: str = Field(index=True, unique=True)
+    created_at: datetime = Field(default_factory=utcnow)
+    last_used_at: Optional[datetime] = None
+
+
 class Farmer(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     public_id: str = Field(index=True, unique=True)  # pseudonymous, e.g. FMR-0042
@@ -256,6 +267,25 @@ class Order(SQLModel, table=True):
     payment_ref: Optional[str] = None
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
+
+
+class OffTakeContract(SQLModel, table=True):
+    """A buyer's agreement to buy part of a farmer's future harvest. Accepted contracts are
+    evidence of market certainty in the farmer's credit assessment."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    buyer_id: int = Field(foreign_key="buyer.id", index=True)
+    farmer_id: int = Field(foreign_key="farmer.id", index=True)
+    crop_type: str
+    quantity_kg: float
+    price_per_kg: float
+    currency: str = "TZS"
+    delivery_month: str  # YYYY-MM
+    note: str = ""
+    # OFFERED | ACCEPTED | DECLINED | CANCELLED | FULFILLED
+    status: str = "OFFERED"
+    created_at: datetime = Field(default_factory=utcnow)
+    decided_at: Optional[datetime] = None
 
 
 class OrderMessage(SQLModel, table=True):

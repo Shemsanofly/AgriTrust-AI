@@ -3,6 +3,7 @@ import {
   Boxes,
   CloudSun,
   FileCheck2,
+  FileSignature,
   FileText,
   Flag,
   Gauge,
@@ -42,6 +43,7 @@ export const NAV: Record<Role, NavItem[]> = {
   BUYER: [
     { to: '/', key: 'nav.marketplace', icon: Store },
     { to: '/orders', key: 'nav.myOrders', icon: Package },
+    { to: '/contracts', key: 'nav.contracts', icon: FileSignature },
     { to: '/verified', key: 'nav.verifiedBatches', icon: ShieldCheck },
     { to: '/suppliers', key: 'nav.suppliers', icon: Users },
     { to: '/payments', key: 'nav.payments', icon: Wallet },

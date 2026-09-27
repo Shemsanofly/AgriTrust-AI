@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     # Weather: "live" calls Open-Meteo and falls back to simulated data if offline.
     weather_mode: str = "live"
     open_meteo_base: str = "https://api.open-meteo.com/v1"
+    # Place names from GPS: "live" asks OpenStreetMap, "offline" uses the nearest region only.
+    geocode_mode: str = "live"
 
     africastalking_username: str = "sandbox"
     africastalking_api_key: str = ""
@@ -39,6 +41,11 @@ class Settings(BaseSettings):
     # Passkeys / device biometrics (WebAuthn). RP ID must be the site's host name.
     webauthn_rp_id: str = "localhost"
     webauthn_origins: str = "http://localhost:5173,http://localhost:8080,http://localhost:4173"
+
+    # Face sign-in (FACEIO, https://console.faceio.net). Both empty = feature hidden.
+    # The public ID goes to the browser; the API key stays on the server.
+    faceio_public_id: str = ""
+    faceio_api_key: str = ""
 
     # Orders above this value (TZS) need PIN step-up confirmation.
     step_up_threshold_tzs: int = 500_000

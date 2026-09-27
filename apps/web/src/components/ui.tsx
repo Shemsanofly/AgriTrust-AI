@@ -194,9 +194,9 @@ export function VerifyBadge({ status, size = 'sm' }: { status?: string | null; s
 
 export function StatusBadge({ status }: { status: string }) {
   const { t } = useTranslation()
-  const good = ['APPROVED', 'ACTIVE', 'SALE_CONFIRMED', 'PAID', 'DISBURSED', 'CLOSED', 'DELIVERED', 'IN_STORAGE']
+  const good = ['FULFILLED', 'APPROVED', 'ACTIVE', 'SALE_CONFIRMED', 'PAID', 'DISBURSED', 'CLOSED', 'DELIVERED', 'IN_STORAGE']
   const bad = ['DECLINED', 'REJECTED', 'CANCELLED', 'REVOKED', 'EXPIRED']
-  const waiting = ['REQUESTED', 'SUBMITTED', 'UNDER_REVIEW', 'FILED', 'EVIDENCE_ATTACHED', 'HARVESTED']
+  const waiting = ['OFFERED', 'REQUESTED', 'SUBMITTED', 'UNDER_REVIEW', 'FILED', 'EVIDENCE_ATTACHED', 'HARVESTED']
   const tone: Tone = good.includes(status) ? 'green' : bad.includes(status) ? 'red' : waiting.includes(status) ? 'gold' : 'blue'
   return <Badge tone={tone}>{t(`status.${status}`, { defaultValue: status })}</Badge>
 }

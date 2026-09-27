@@ -11,7 +11,7 @@ from ..config import get_settings
 from ..db import get_session
 from ..i18n import bi
 from ..integrations.sms import send_sms
-from ..models import Buyer, Farmer, Language, RefreshToken, Role, User, WebAuthnCredential, utcnow
+from ..models import Buyer, FaceLogin, Farmer, Language, RefreshToken, Role, User, WebAuthnCredential, utcnow
 from ..notify import notify
 from ..security.audit import audit
 from ..security.auth import (
@@ -331,6 +331,7 @@ def my_security(user: User = Depends(get_current_user), session: Session = Depen
             {"id": c.id, "label": c.label, "created_at": c.created_at.isoformat(), "last_used_at": c.last_used_at.isoformat() if c.last_used_at else None}
             for c in creds
         ],
+        "face_enrolled": session.exec(select(FaceLogin).where(FaceLogin.user_id == user.id)).first() is not None,
         "pin_set": True,
         "phone_verified": user.status == "ACTIVE",
     }

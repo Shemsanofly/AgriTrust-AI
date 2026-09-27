@@ -1,4 +1,4 @@
-import { Fingerprint, KeyRound, Laptop, LogOut, ShieldCheck, Smartphone, Trash2 } from 'lucide-react'
+import { Fingerprint, KeyRound, Laptop, LogOut, ScanFace, ShieldCheck, Smartphone, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LanguageSwitcher } from '../../components/LanguageSwitcher'
@@ -6,10 +6,11 @@ import { Badge, Button, Card, EmptyState, ErrorNote, KeyValues, Notice, PageHead
 import { ApiError, api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { biometricAvailable, enrolBiometric } from '../../lib/biometric'
+import { enrollFace, faceConfig, faceErrorKey } from '../../lib/faceio'
 import { useApi, useErrorText, useFormat } from '../../lib/hooks'
 
 type Session = { id: number; device: string; login_method: string; started_at: string; last_active_at: string; current: boolean }
-type Security = { passkeys: { id: number; label: string; created_at: string; last_used_at: string | null }[] }
+type Security = { passkeys: { id: number; label: string; created_at: string; last_used_at: string | null }[]; face_enrolled: boolean }
 
 export function ProfilePage() {
   const { t } = useTranslation()
@@ -20,11 +21,13 @@ export function ProfilePage() {
   const { data: security, reload: reloadSecurity } = useApi<Security>('/me/security')
   const { data: sessions, loading: sessionsLoading, reload: reloadSessions } = useApi<Session[]>('/me/sessions')
   const [supported, setSupported] = useState<boolean | null>(null)
+  const [faceOn, setFaceOn] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     biometricAvailable().then(setSupported)
+    faceConfig().then((c) => setFaceOn(c.enabled))
   }, [])
   if (!user) return null
 
@@ -41,6 +44,27 @@ export function ProfilePage() {
     } finally {
       setBusy(null)
     }
+  }
+
+  const addFace = async () => {
+    setBusy('face')
+    setError(null)
+    try {
+      const facialId = await enrollFace()
+      await api('/auth/face/enroll', { method: 'POST', body: { facial_id: facialId } })
+      reloadSecurity()
+      toast(t('face.on'))
+    } catch (err) {
+      setError(err instanceof ApiError ? errorText(err) : t(`face.err.${faceErrorKey(err)}`))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const removeFace = async () => {
+    await api('/auth/face', { method: 'DELETE' })
+    reloadSecurity()
+    toast(t('face.removed'))
   }
 
   const removeKey = async (id: number) => {
@@ -117,6 +141,29 @@ export function ProfilePage() {
               </Button>
             )}
           </div>
+          {faceOn && (
+            <div className="flex flex-wrap items-start gap-3 border-t border-line pt-4">
+              <span className="flex size-10 items-center justify-center rounded-md bg-forest-100 text-forest-800">
+                <ScanFace className="size-5" aria-hidden />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+                  {t('face.title')}
+                  {security?.face_enrolled ? <Badge tone="green">{t('security.on')}</Badge> : <Badge>{t('security.off')}</Badge>}
+                </div>
+                <p className="mt-0.5 text-[13px] text-muted">{t('face.privacy')}</p>
+              </div>
+              {security?.face_enrolled ? (
+                <Button variant="ghost" size="sm" icon={Trash2} onClick={removeFace}>
+                  {t('security.remove')}
+                </Button>
+              ) : (
+                <Button icon={ScanFace} busy={busy === 'face'} onClick={addFace}>
+                  {t('face.setup')}
+                </Button>
+              )}
+            </div>
+          )}
           <ErrorNote text={error} />
           <Notice tone="neutral">{t('security.privacyNote')}</Notice>
           <div className="flex items-start gap-3 border-t border-line pt-4">

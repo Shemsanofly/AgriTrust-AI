@@ -1,14 +1,16 @@
-import { ArrowRight, Fingerprint, Lock, Phone, ShieldCheck } from 'lucide-react'
+import { ArrowRight, Fingerprint, Lock, ScanFace, ShieldCheck } from 'lucide-react'
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router-dom'
 import { BrandMark } from '../../components/Layout'
 import { LanguageSwitcher } from '../../components/LanguageSwitcher'
+import { PhoneInput } from '../../components/PhoneInput'
 import { Button, ErrorNote, Field, Notice, Segmented } from '../../components/ui'
 import { currentLang } from '../../i18n'
-import { ApiError, api } from '../../lib/api'
+import { ApiError, api, setTokens } from '../../lib/api'
 import { rememberedPhone, useAuth } from '../../lib/auth'
 import { biometricAvailable } from '../../lib/biometric'
+import { enrollFace, faceConfig, faceErrorKey, recogniseFace } from '../../lib/faceio'
 import { useErrorText } from '../../lib/hooks'
 
 const DEMO = [
@@ -70,17 +72,20 @@ function AuthShell({ children, title, subtitle }: { children: ReactNode; title: 
 
 export function LoginPage() {
   const { t } = useTranslation()
-  const { login, loginWithBiometric } = useAuth()
+  const { login, loginWithBiometric, completeLogin } = useAuth()
   const errorText = useErrorText()
   const navigate = useNavigate()
   const [phone, setPhone] = useState(rememberedPhone())
   const [pin, setPin] = useState('')
-  const [busy, setBusy] = useState<'pin' | 'bio' | null>(null)
+  const [busy, setBusy] = useState<'pin' | 'bio' | 'face' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [bio, setBio] = useState(false)
+  const [face, setFace] = useState(false)
+  const [pinWrong, setPinWrong] = useState(false)
 
   useEffect(() => {
     biometricAvailable().then(setBio)
+    faceConfig().then((c) => setFace(c.enabled))
   }, [])
 
   const describe = (err: unknown) => {
@@ -88,6 +93,7 @@ export function LoginPage() {
       return t('auth.attemptsLeft', { count: err.details.attempts_left })
     }
     if (err instanceof ApiError && err.code === 'no_passkey') return t('security.noPasskeyYet')
+    if (err instanceof ApiError && err.code === 'face_not_recognised') return t('face.err.notLinked')
     if (!(err instanceof ApiError)) return t('security.biometricCancelled')
     return errorText(err)
   }
@@ -101,6 +107,7 @@ export function LoginPage() {
       navigate('/')
     } catch (err) {
       setError(describe(err))
+      setPinWrong(true)
       setPin('')
     } finally {
       setBusy(null)
@@ -120,14 +127,25 @@ export function LoginPage() {
     }
   }
 
+  const faceLogin = async () => {
+    setBusy('face')
+    setError(null)
+    try {
+      const facialId = await recogniseFace()
+      completeLogin(await api('/auth/face/login', { method: 'POST', body: { facial_id: facialId }, auth: false }))
+      navigate('/')
+    } catch (err) {
+      setError(err instanceof ApiError ? describe(err) : t(`face.err.${faceErrorKey(err)}`))
+    } finally {
+      setBusy(null)
+    }
+  }
+
   return (
     <AuthShell title={t('auth.loginTitle')} subtitle={t('auth.loginSubtitle')}>
       <form onSubmit={submit} className="space-y-4" noValidate>
         <Field label={t('auth.phone')}>
-          <div className="relative">
-            <Phone className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" aria-hidden />
-            <input className="input pl-9" type="tel" inputMode="tel" autoComplete="tel" placeholder="+255 7XX XXX XXX" value={phone} onChange={(e) => setPhone(e.target.value)} required />
-          </div>
+          <PhoneInput label={t('auth.phone')} value={phone} onChange={setPhone} />
         </Field>
         <Field label={t('auth.pin')}>
           <div className="relative">
@@ -139,8 +157,8 @@ export function LoginPage() {
               autoComplete="current-password"
               maxLength={6}
               value={pin}
-              aria-invalid={Boolean(error)}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+              aria-invalid={pinWrong}
+              onChange={(e) => (setPin(e.target.value.replace(/\D/g, '')), setPinWrong(false))}
               required
             />
           </div>
@@ -152,6 +170,11 @@ export function LoginPage() {
         {bio && (
           <Button variant="secondary" size="lg" icon={Fingerprint} busy={busy === 'bio'} disabled={!phone} onClick={biometric} className="w-full">
             {t('auth.loginBiometric')}
+          </Button>
+        )}
+        {face && (
+          <Button variant="secondary" size="lg" icon={ScanFace} busy={busy === 'face'} onClick={faceLogin} className="w-full">
+            {t('face.signIn')}
           </Button>
         )}
       </form>
@@ -196,6 +219,8 @@ export function RegisterPage() {
   const navigate = useNavigate()
   const [form, setForm] = useState({ role: 'FARMER', full_name: '', phone: '', pin: '', pin2: '', region: '', district: '', cooperative: '', business_name: '', country: 'TZ' })
   const [otpStep, setOtpStep] = useState<{ devOtp?: string } | null>(null)
+  // After OTP: the new account's sign-in, held until the optional Face ID step is done.
+  const [faceStep, setFaceStep] = useState<Parameters<typeof completeLogin>[0] | null>(null)
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -241,13 +266,69 @@ export function RegisterPage() {
     setBusy(true)
     setError(null)
     try {
-      completeLogin(await api('/auth/otp/verify', { method: 'POST', body: { phone: form.phone.replace(/\s/g, ''), code }, auth: false }))
-      navigate('/')
+      const res = await api<Parameters<typeof completeLogin>[0]>('/auth/otp/verify', { method: 'POST', body: { phone: form.phone.replace(/\s/g, ''), code }, auth: false })
+      if ((await faceConfig()).enabled) {
+        // Tokens only: signing in fully would leave this page before the Face ID step.
+        setTokens({ access_token: res.access_token, refresh_token: res.refresh_token })
+        setFaceStep(res)
+      } else {
+        completeLogin(res)
+        navigate('/')
+      }
     } catch (err) {
       setError(errorText(err))
     } finally {
       setBusy(false)
     }
+  }
+
+  const finish = () => {
+    completeLogin(faceStep!)
+    navigate('/')
+  }
+
+  const addFace = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      const facialId = await enrollFace()
+      await api('/auth/face/enroll', { method: 'POST', body: { facial_id: facialId } })
+      finish()
+    } catch (err) {
+      setError(err instanceof ApiError ? errorText(err) : t(`face.err.${faceErrorKey(err)}`))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (faceStep) {
+    return (
+      <AuthShell title={t('face.setupTitle')} subtitle={t('face.setupSubtitle')}>
+        <div className="space-y-4">
+          <div className="flex justify-center py-2">
+            <span className="flex size-20 items-center justify-center rounded-full bg-forest-50 text-forest-800">
+              <ScanFace className="size-10" aria-hidden />
+            </span>
+          </div>
+          <ul className="space-y-2 text-sm text-ink-soft">
+            {(['light', 'still', 'alone'] as const).map((tip) => (
+              <li key={tip} className="flex gap-2">
+                <span className="mt-2 size-1.5 shrink-0 rounded-full bg-forest-700" aria-hidden />
+                {t(`face.tips.${tip}`)}
+              </li>
+            ))}
+          </ul>
+          <Notice tone="neutral">{t('face.privacy')}</Notice>
+          <ErrorNote text={error} />
+          <Button size="lg" icon={ScanFace} busy={busy} onClick={addFace} className="w-full">
+            {t('face.setup')}
+          </Button>
+          <Button variant="ghost" size="lg" disabled={busy} onClick={finish} className="w-full">
+            {t('face.skip')}
+          </Button>
+        </div>
+      </AuthShell>
+    )
   }
 
   if (otpStep) {
@@ -283,7 +364,7 @@ export function RegisterPage() {
           <input className="input" autoComplete="name" value={form.full_name} onChange={set('full_name')} aria-invalid={Boolean(show('full_name'))} />
         </Field>
         <Field label={t('auth.phone')} error={show('phone')}>
-          <input className="input" type="tel" autoComplete="tel" placeholder="+255 7XX XXX XXX" value={form.phone} onChange={set('phone')} aria-invalid={Boolean(show('phone'))} />
+          <PhoneInput label={t('auth.phone')} value={form.phone} onChange={(phone) => setForm({ ...form, phone })} invalid={Boolean(show('phone'))} />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label={t('auth.choosePin')} error={show('pin')}>
@@ -317,7 +398,6 @@ export function RegisterPage() {
             </Field>
           </div>
         )}
-        <p className="text-xs text-muted">{t('auth.languageSaved')}</p>
         <ErrorNote text={error} />
         <Button type="submit" size="lg" busy={busy} className="w-full">
           {t('auth.continue')} <ArrowRight className="size-4" aria-hidden />

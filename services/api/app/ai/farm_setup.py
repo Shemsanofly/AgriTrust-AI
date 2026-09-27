@@ -131,3 +131,35 @@ def predict_setup(lat: float, lon: float, region: str | None = None) -> FarmSetu
         ],
         inputs=inputs,
     )
+
+
+SALINITY_MODEL_VERSION = "salinity-location-rules-v0.1"
+
+
+def estimate_salinity(lat: float, lon: float, region: str | None, soil_type: str, irrigation_type: str) -> dict[str, Any]:
+    """Estimated soil salinity as electrical conductivity (EC, dS/m) when no sensor measures it.
+
+    Rules: dry zones and coastal lowlands accumulate more salt than highlands; clay holds salt,
+    sand leaches it; surface (furrow/flood) irrigation in dry areas builds salt up, drip does not.
+    Bands (FAO): under 2 non-saline, 2-4 slightly saline, over 4 saline."""
+    r = _norm(region)
+    if r in {"dodoma", "singida", "shinyanga", "simiyu", "manyara"} or (-7.9 <= lat <= -3.5 and 33.0 <= lon <= 36.8):
+        ec, zone = 1.2, _reason("Semi-arid zone: low rainfall leaves salts in the topsoil.", "Ukanda wenye ukame: mvua chache huacha chumvi kwenye udongo wa juu.")
+        dry = True
+    elif r in {"pwani", "dar es salaam", "lindi", "mtwara", "tanga"} or lon >= 38.5:
+        ec, zone = 1.4, _reason("Coastal lowland: sea influence can raise salt levels.", "Tambarare za pwani: bahari inaweza kuongeza chumvi.")
+        dry = False
+    elif r in {"mbeya", "iringa", "njombe", "rukwa", "kilimanjaro", "arusha"}:
+        ec, zone = 0.4, _reason("Highland rainfall washes salts out of the soil.", "Mvua za nyanda za juu huosha chumvi kutoka udongoni.")
+        dry = False
+    else:
+        ec, zone = 0.8, _reason("No specific local rule: moderate starting estimate.", "Hakuna kanuni mahususi ya eneo: makadirio ya wastani.")
+        dry = False
+    soil = _norm(soil_type)
+    ec += 0.4 if "clay" in soil else -0.2 if soil == "sandy" else 0.0
+    irrigation = _norm(irrigation_type)
+    if dry and irrigation in {"furrow", "flood"}:
+        ec += 0.8
+    ec = round(max(0.2, ec), 1)
+    band = "non_saline" if ec < 2 else "slightly_saline" if ec <= 4 else "saline"
+    return {"ec_ds_m": ec, "band": band, "source": "ai_estimate", "reason": zone, "model_version": SALINITY_MODEL_VERSION}
