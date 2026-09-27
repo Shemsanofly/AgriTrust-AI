@@ -24,3 +24,4 @@ iot/firmware/**/secrets.h
 *.db.bak*
 *.log
 *.tsbuildinfo
+services/api/uploads/

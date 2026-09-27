@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 from typing import Literal, Optional
 
@@ -30,6 +31,7 @@ from ..notify import notify
 from ..security.audit import audit
 from ..security.auth import farmer_for, get_current_user, require_pin, require_roles
 from ..security.consent import DATA_CATEGORIES, require_consent
+from .loan_docs import attach, documents_for_loan
 
 router = APIRouter(tags=["kifedha"])
 
@@ -51,6 +53,8 @@ class LoanIn(BaseModel):
     purpose: str = Field(min_length=3, max_length=200)
     repayment_month: Optional[str] = Field(default=None, pattern=r"^\d{4}-\d{2}$")
     confirm_pin: str
+    # Supporting documents uploaded first via POST /loan-documents (at least one on the web).
+    document_ids: list[int] = Field(default_factory=list, max_length=10)
 
 
 class LoanDecisionIn(BaseModel):
@@ -267,6 +271,7 @@ def loan_json(session: Session, loan: LoanApplication, viewer: User) -> dict:
         "lender": {"id": lender.id, "name": lender.full_name} if lender else None,
         "decided_by_name": decider.full_name if decider else None,
         "consent": consent_json(session, consent) if consent else None,
+        "documents": documents_for_loan(session, loan.id),
     }
 
 
@@ -297,9 +302,12 @@ def submit_loan(
 
 @router.post("/loans", status_code=201)
 def apply_loan(body: LoanIn, user: User = Depends(require_roles(Role.FARMER)), session: Session = Depends(get_session)):
+    if not body.document_ids:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "document_required")
     require_pin(user, body.confirm_pin)
     farmer = farmer_for(session, user)
     loan = submit_loan(session, user, farmer, body.lender_user_id, body.amount, body.purpose, body.repayment_month)
+    attach(session, farmer, loan, body.document_ids)
     session.commit()
     return loan_json(session, loan, user)
 
@@ -371,6 +379,52 @@ def decide_loan(loan_id: int, body: LoanDecisionIn, user: User = Depends(require
 
 
 # ---------------------------------------------------------------- insurance
+
+
+@router.get("/insurance/hazards")
+def disaster_forecast(user: User = Depends(require_roles(Role.FARMER)), session: Session = Depends(get_session)):
+    """AI forecast of drought, fire and flood for each of the farmer's farms, with what to do.
+    High dangers also become an in-app alert (once a day per farm and hazard)."""
+    from ..ai import hazards
+    from ..integrations.hazard_data import hazard_inputs
+    from ..models import Alert, Sensor, SensorReading
+
+    farmer = farmer_for(session, user)
+    today = utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    farms = session.exec(select(Farm).where(Farm.farmer_id == farmer.id).order_by(Farm.acreage.desc())).all()[:3]  # type: ignore[attr-defined]
+    # Fetch every farm's forecasts at the same time (network-bound), then score them.
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        inputs = dict(zip([f.id for f in farms], pool.map(lambda f: hazard_inputs(f.lat, f.lon), farms)))
+    out = []
+    for farm in farms:
+        sensor_ids = [x.id for x in session.exec(select(Sensor).where(Sensor.farm_id == farm.id))]
+        reading = (
+            session.exec(
+                select(SensorReading)
+                .where(SensorReading.sensor_id.in_(sensor_ids), SensorReading.metric == "soil_moisture_pct")  # type: ignore[union-attr]
+                .order_by(SensorReading.ts.desc())  # type: ignore[attr-defined]
+            ).first()
+            if sensor_ids
+            else None
+        )
+        moisture = reading.value if reading else farm.soil_moisture_pct
+        growing = session.exec(select(Crop).where(Crop.farm_id == farm.id, Crop.growth_stage != "harvested")).first() is not None
+        result = hazards.forecast(inputs[farm.id], moisture, farmer.region.strip().lower() in DROUGHT_PRONE_REGIONS, growing)
+        for h in result["hazards"]:
+            if h["level"] not in ("high", "severe"):
+                continue
+            key = f"{farm.id}:{h['hazard']}"
+            already = session.exec(select(Alert).where(Alert.user_id == user.id, Alert.kind == "DISASTER_RISK", Alert.entity_id == key, Alert.created_at >= today)).first()
+            if not already:
+                message = bi("alert.hazard", hazard=bi(f"hazard.name.{h['hazard']}"), level=bi(f"hazard.level.{h['level']}"), farm=farm.name, start=hazards._day(h["start"]), end=hazards._day(h["end"]))
+                notify(session, user, "DISASTER_RISK", message, severity="CRITICAL" if h["level"] == "severe" else "WARNING", entity_type="FARM_HAZARD", entity_id=key)
+        out.append({"farm_id": farm.id, "name": farm.name, "region": farm.region, **result})
+    session.commit()
+    return {
+        "generated_at": utcnow().isoformat(),
+        "farms": out,
+        "sources": ["Open-Meteo forecast (ECMWF and national models)", "GloFAS river-flow forecast (Copernicus EMS)", "ERA5 climate reanalysis, last 10 years"],
+    }
 
 
 @router.get("/insurance/recommendations")

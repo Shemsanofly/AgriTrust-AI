@@ -62,6 +62,16 @@ class Settings(BaseSettings):
     faceio_public_id: str = ""
     faceio_api_key: str = ""
 
+    # Payments. "simulated" moves no money; "snippe" sends a real mobile-money USSD push
+    # through Snippe (https://snippe.sh) and marks the order paid only when Snippe confirms.
+    payments_provider: str = "simulated"  # simulated | snippe
+    snippe_api_key: str = ""
+    snippe_webhook_secret: str = ""  # Snippe dashboard: Settings -> Webhook Secret
+    snippe_base_url: str = "https://api.snippe.sh/api/v1"
+
+    # Farmer uploads (crop photos). Relative paths are inside services/api.
+    upload_dir: str = "uploads"
+
     # Orders above this value (TZS) need PIN step-up confirmation.
     step_up_threshold_tzs: int = 500_000
     max_failed_logins: int = 5

@@ -191,6 +191,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "New order from {buyer}: {qty} kg of {batch} at {price} TZS/kg",
         "sw": "Oda mpya kutoka {buyer}: kg {qty} za {batch} kwa TZS {price}/kg",
     },
+    "alert.payment_failed": {
+        "en": "Payment for order #{order} did not go through ({reason}). You can try again.",
+        "sw": "Malipo ya oda #{order} hayajafanikiwa ({reason}). Unaweza kujaribu tena.",
+    },
     "alert.order_status": {
         "en": "Order #{order} is now {status}",
         "sw": "Oda #{order} sasa iko katika hali: {status}",
@@ -890,6 +894,304 @@ MESSAGES: dict[str, dict[str, str]] = {
     "credit.cond.no_data": {
         "en": "No soil readings or estimates yet",
         "sw": "Bado hakuna vipimo au makadirio ya udongo",
+    },
+    # --- AI loan eligibility: feature labels and tips
+    "ai.f.sales_count": {
+        "en": "Verified sales: {v}",
+        "sw": "Mauzo yaliyothibitishwa: {v}",
+    },
+    "ai.f.sales_income": {
+        "en": "Verified income: TZS {v}",
+        "sw": "Mapato yaliyothibitishwa: TZS {v}",
+    },
+    "ai.f.distinct_buyers": {
+        "en": "Different buyers: {v}",
+        "sw": "Wanunuzi tofauti: {v}",
+    },
+    "ai.f.selling_months": {
+        "en": "Months with sales: {v}",
+        "sw": "Miezi yenye mauzo: {v}",
+    },
+    "ai.f.savings": {
+        "en": "Savings: TZS {v}",
+        "sw": "Akiba: TZS {v}",
+    },
+    "ai.f.loans_repaid": {
+        "en": "Loans repaid: {v}",
+        "sw": "Mikopo iliyolipwa: {v}",
+    },
+    "ai.f.loans_open": {
+        "en": "Loans still being repaid: {v}",
+        "sw": "Mikopo inayoendelea kulipwa: {v}",
+    },
+    "ai.f.seasons": {
+        "en": "Seasons recorded: {v}",
+        "sw": "Misimu iliyorekodiwa: {v}",
+    },
+    "ai.f.harvest_kg": {
+        "en": "Total harvested: {v} kg",
+        "sw": "Jumla ya mavuno: kg {v}",
+    },
+    "ai.f.harvest_consistency": {
+        "en": "Harvest steadiness: {v}",
+        "sw": "Uthabiti wa mavuno: {v}",
+    },
+    "ai.f.ghala_receipts": {
+        "en": "Ghala receipts: {v}",
+        "sw": "Stakabadhi za ghala: {v}",
+    },
+    "ai.f.storage_alerts": {
+        "en": "Unresolved spoilage alerts: {v}",
+        "sw": "Tahadhari za kuharibika zisizoshughulikiwa: {v}",
+    },
+    "ai.f.advice_follow_rate": {
+        "en": "Irrigation advice followed: {v}",
+        "sw": "Ushauri wa umwagiliaji uliofuatwa: {v}",
+    },
+    "ai.f.acres": {
+        "en": "Farm size: {v} acres",
+        "sw": "Ukubwa wa shamba: ekari {v}",
+    },
+    "ai.f.drought_rainfed_1": {
+        "en": "Rain-fed farm in a drought-prone region",
+        "sw": "Shamba linalotegemea mvua katika eneo la ukame",
+    },
+    "ai.f.drought_rainfed_0": {
+        "en": "Irrigated or low drought risk",
+        "sw": "Linamwagiliwa au hatari ndogo ya ukame",
+    },
+    "ai.f.offtake_coverage": {
+        "en": "Harvest covered by buyer contracts: {v}",
+        "sw": "Mavuno yenye mikataba ya wanunuzi: {v}",
+    },
+    "ai.f.soil_condition": {
+        "en": "Soil condition: {v}/100",
+        "sw": "Hali ya udongo: {v}/100",
+    },
+    "ai.f.account_age": {
+        "en": "Track record: {v} days",
+        "sw": "Rekodi ya shughuli: siku {v}",
+    },
+    "ai.f.activity_90d": {
+        "en": "Activities in the last 90 days: {v}",
+        "sw": "Shughuli katika siku 90 zilizopita: {v}",
+    },
+    "ai.f.coming_harvest_1": {
+        "en": "A harvest is coming to repay from",
+        "sw": "Mavuno yanakuja ya kulipia mkopo",
+    },
+    "ai.f.coming_harvest_0": {
+        "en": "No coming harvest recorded",
+        "sw": "Hakuna mavuno yajayo yaliyorekodiwa",
+    },
+    "ai.tip.sales_count": {
+        "en": "Sell through the Market so each sale is verified.",
+        "sw": "Uza kupitia Soko ili kila mauzo yathibitishwe.",
+    },
+    "ai.tip.sales_income": {
+        "en": "Sell more of your harvest through the platform.",
+        "sw": "Uza zaidi ya mavuno yako kupitia jukwaa.",
+    },
+    "ai.tip.distinct_buyers": {
+        "en": "Sell to more than one buyer.",
+        "sw": "Uza kwa zaidi ya mnunuzi mmoja.",
+    },
+    "ai.tip.selling_months": {
+        "en": "Sell regularly rather than all at once.",
+        "sw": "Uza mara kwa mara badala ya mara moja tu.",
+    },
+    "ai.tip.savings": {
+        "en": "Put some money in a savings goal.",
+        "sw": "Weka pesa kidogo kwenye lengo la akiba.",
+    },
+    "ai.tip.loans_repaid": {
+        "en": "Repaying a small loan on time builds your record.",
+        "sw": "Kulipa mkopo mdogo kwa wakati hujenga rekodi yako.",
+    },
+    "ai.tip.loans_open": {
+        "en": "Finish repaying your current loan first.",
+        "sw": "Maliza kulipa mkopo wako wa sasa kwanza.",
+    },
+    "ai.tip.seasons": {
+        "en": "Record every season's harvest.",
+        "sw": "Rekodi mavuno ya kila msimu.",
+    },
+    "ai.tip.harvest_kg": {
+        "en": "Record all of your harvests.",
+        "sw": "Rekodi mavuno yako yote.",
+    },
+    "ai.tip.harvest_consistency": {
+        "en": "Steadier harvests help: follow the planting and irrigation advice.",
+        "sw": "Mavuno thabiti husaidia: fuata ushauri wa kupanda na kumwagilia.",
+    },
+    "ai.tip.ghala_receipts": {
+        "en": "Store your harvest in a verified ghala.",
+        "sw": "Hifadhi mavuno yako katika ghala lililothibitishwa.",
+    },
+    "ai.tip.storage_alerts": {
+        "en": "Deal with the spoilage alerts on your stored crop.",
+        "sw": "Shughulikia tahadhari za kuharibika kwa mazao yaliyohifadhiwa.",
+    },
+    "ai.tip.advice_follow_rate": {
+        "en": "Follow the irrigation advice and mark it as done.",
+        "sw": "Fuata ushauri wa umwagiliaji na uweke alama umefanya.",
+    },
+    "ai.tip.acres": {
+        "en": "Register all the land you farm.",
+        "sw": "Sajili ardhi yote unayolima.",
+    },
+    "ai.tip.drought_rainfed": {
+        "en": "Irrigation or weather-index insurance lowers drought risk.",
+        "sw": "Umwagiliaji au bima ya hali ya hewa hupunguza hatari ya ukame.",
+    },
+    "ai.tip.offtake_coverage": {
+        "en": "Accept a buyer's contract for your coming harvest.",
+        "sw": "Kubali mkataba wa mnunuzi kwa mavuno yako yajayo.",
+    },
+    "ai.tip.soil_condition": {
+        "en": "Improve the soil (pH, moisture); follow the soil advice.",
+        "sw": "Boresha udongo (pH, unyevu); fuata ushauri wa udongo.",
+    },
+    "ai.tip.account_age": {
+        "en": "Your track record grows as you keep recording farm activity.",
+        "sw": "Rekodi yako hukua kadiri unavyoendelea kurekodi shughuli za shamba.",
+    },
+    "ai.tip.activity_90d": {
+        "en": "Keep your farm, harvests and sales up to date.",
+        "sw": "Sasisha shamba, mavuno na mauzo yako mara kwa mara.",
+    },
+    "ai.tip.coming_harvest": {
+        "en": "Add your crop with its expected harvest date.",
+        "sw": "Ongeza zao lako pamoja na tarehe ya mavuno inayotarajiwa.",
+    },
+    "profile.product.input_loan_sales": {
+        "en": "Sized to your verified sales of the past year",
+        "sw": "Kulingana na mauzo yako yaliyothibitishwa ya mwaka uliopita",
+    },
+    # --- disaster forecast (drought, fire, flood)
+    "hazard.why.water_balance": {
+        "en": "Next 16 days: {rain} mm of rain expected, while crops lose about {et0} mm to heat and wind",
+        "sw": "Siku 16 zijazo: mvua ya mm {rain} inatarajiwa, huku mazao yakipoteza takriban mm {et0} kwa joto na upepo",
+    },
+    "hazard.why.dry_season": {
+        "en": "These dates are normally dry here ({normal} mm on average in the last 10 years)",
+        "sw": "Tarehe hizi kwa kawaida ni kavu hapa (wastani wa mm {normal} katika miaka 10 iliyopita)",
+    },
+    "hazard.why.vs_normal": {
+        "en": "Rain forecast is {pct}% of the normal {normal} mm for these dates",
+        "sw": "Mvua inayotabiriwa ni {pct}% ya kawaida ya mm {normal} kwa tarehe hizi",
+    },
+    "hazard.why.soil": {
+        "en": "Soil moisture now: {pct}%",
+        "sw": "Unyevu wa udongo sasa: {pct}%",
+    },
+    "hazard.why.drought_region": {
+        "en": "This region is drought-prone",
+        "sw": "Eneo hili lina hatari ya ukame",
+    },
+    "hazard.why.fire_weather": {
+        "en": "Hottest, driest day {day}: {t}°C, humidity down to {rh}%, wind up to {wind} km/h",
+        "sw": "Siku yenye joto na ukavu zaidi {day}: {t}°C, unyevu hewani hadi {rh}%, upepo hadi km/h {wind}",
+    },
+    "hazard.why.dry_days": {
+        "en": "{n} of the next {total} days without rain",
+        "sw": "Siku {n} kati ya {total} zijazo bila mvua",
+    },
+    "hazard.why.no_river": {
+        "en": "No large river flows at this spot (river flow forecast)",
+        "sw": "Hakuna mto mkubwa unaopita mahali hapa (utabiri wa mtiririko wa mito)",
+    },
+    "hazard.why.river": {
+        "en": "River flow expected to reach {pct}% of this year's high-water level (peak {day})",
+        "sw": "Mtiririko wa mto unatarajiwa kufikia {pct}% ya kiwango cha maji mengi cha mwaka huu (kilele {day})",
+    },
+    "hazard.why.heavy_rain": {
+        "en": "Wettest 3 days in the forecast: {mm} mm (heaviest day {day_max} mm)",
+        "sw": "Siku 3 zenye mvua nyingi zaidi katika utabiri: mm {mm} (siku yenye mvua nyingi mm {day_max})",
+    },
+    "hazard.rec.drought.low": {
+        "en": "No drought expected. Keep following the irrigation advice on My farm.",
+        "sw": "Hakuna ukame unaotarajiwa. Endelea kufuata ushauri wa umwagiliaji kwenye Shamba langu.",
+    },
+    "hazard.rec.drought.1": {
+        "en": "Irrigate early in the morning or in the evening so less water evaporates.",
+        "sw": "Mwagilia asubuhi mapema au jioni ili maji machache yapotee kwa mvuke.",
+    },
+    "hazard.rec.drought.2": {
+        "en": "Mulch around your crops (dry grass or crop residue) to keep the soil moist.",
+        "sw": "Weka matandazo kuzunguka mazao (majani makavu au mabaki ya mazao) ili udongo ubaki na unyevu.",
+    },
+    "hazard.rec.drought.3": {
+        "en": "Give water first to crops that are flowering or filling grain; hold back on new planting.",
+        "sw": "Toa maji kwanza kwa mazao yanayochanua au kujaza punje; subiri kupanda mapya.",
+    },
+    "hazard.rec.drought.4": {
+        "en": "Consider weather-index (drought) insurance before the next planting season.",
+        "sw": "Fikiria bima ya hali ya hewa (ukame) kabla ya msimu ujao wa kupanda.",
+    },
+    "hazard.rec.fire.low": {
+        "en": "Fire danger is low. Keep grass short around your ghala and home.",
+        "sw": "Hatari ya moto ni ndogo. Weka majani mafupi kuzunguka ghala na nyumbani.",
+    },
+    "hazard.rec.fire.1": {
+        "en": "Do not burn crop residue or clear land with fire this week.",
+        "sw": "Usichome mabaki ya mazao wala kusafisha shamba kwa moto wiki hii.",
+    },
+    "hazard.rec.fire.2": {
+        "en": "Clear a firebreak: remove dry grass for about 3 m around fields, the ghala and stored harvest.",
+        "sw": "Tengeneza njia ya kuzuia moto: ondoa majani makavu takriban mita 3 kuzunguka shamba, ghala na mavuno yaliyohifadhiwa.",
+    },
+    "hazard.rec.fire.3": {
+        "en": "Keep water, sand and a beater ready near the ghala; agree with neighbours who to call.",
+        "sw": "Weka maji, mchanga na kipigo tayari karibu na ghala; kubaliana na majirani nani wa kupigiwa simu.",
+    },
+    "hazard.rec.fire.4": {
+        "en": "Move harvest stored in the open into the ghala, away from dry vegetation.",
+        "sw": "Hamisha mavuno yaliyohifadhiwa nje ndani ya ghala, mbali na majani makavu.",
+    },
+    "hazard.rec.flood.low": {
+        "en": "Flood risk is low. Keep drainage channels around fields clear.",
+        "sw": "Hatari ya mafuriko ni ndogo. Weka mifereji ya maji kuzunguka shamba ikiwa safi.",
+    },
+    "hazard.rec.flood.1": {
+        "en": "Clear drainage channels and ditches around fields and the ghala.",
+        "sw": "Safisha mifereji na mitaro kuzunguka shamba na ghala.",
+    },
+    "hazard.rec.flood.2": {
+        "en": "Raise stored harvest onto pallets and check the ghala roof for leaks.",
+        "sw": "Inua mavuno yaliyohifadhiwa juu ya chaga na kagua paa la ghala kama linavuja.",
+    },
+    "hazard.rec.flood.3": {
+        "en": "Harvest mature crops early and avoid planting in low-lying fields for now.",
+        "sw": "Vuna mazao yaliyokomaa mapema na epuka kupanda katika mashamba ya bondeni kwa sasa.",
+    },
+    "hazard.rec.flood.4": {
+        "en": "Move seed, fertiliser and equipment to higher ground; follow local authority warnings.",
+        "sw": "Hamisha mbegu, mbolea na vifaa mahali pa juu; fuata tahadhari za mamlaka za eneo.",
+    },
+    "alert.hazard": {
+        "en": "{hazard} risk is {level} for {farm} ({start} to {end}). See Finance → Insurance for what to do.",
+        "sw": "Hatari ya {hazard} ni {level} kwa {farm} ({start} hadi {end}). Angalia Fedha → Bima kwa hatua za kuchukua.",
+    },
+    "hazard.name.drought": {
+        "en": "Drought",
+        "sw": "Ukame",
+    },
+    "hazard.name.fire": {
+        "en": "Fire",
+        "sw": "Moto",
+    },
+    "hazard.name.flood": {
+        "en": "Flood",
+        "sw": "Mafuriko",
+    },
+    "hazard.level.high": {
+        "en": "high",
+        "sw": "kubwa",
+    },
+    "hazard.level.severe": {
+        "en": "very high",
+        "sw": "kubwa sana",
     },
     "credit.src.sensor": {
         "en": "sensor",

@@ -4,7 +4,7 @@ a rule-based seasonal cash-flow estimate and eligibility-rule product suggestion
 This is decision support, not a credit score. No protected attributes (gender,
 ethnicity, religion, ...) are used as inputs."""
 
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from sqlmodel import Session, select
@@ -23,7 +23,7 @@ from ..models import (
     WarehouseReceipt,
 )
 
-MODEL_VERSION = "credit-5-criteria-v0.2"
+MODEL_VERSION = "credit-5-criteria-v0.3 + credit-lr-v1"
 DROUGHT_PRONE_REGIONS = {"dodoma", "singida", "shinyanga", "simiyu", "manyara", "tabora"}
 YIELD_KG_PER_ACRE = {"maize": 700.0, "beans": 350.0, "rice": 900.0, "sorghum": 500.0, "sunflower": 400.0}
 DEFAULT_PRICE_TZS = {"maize": 750.0, "beans": 2200.0, "rice": 1800.0, "sorghum": 700.0, "sunflower": 1100.0}
@@ -71,6 +71,157 @@ CRITERIA_WEIGHTS = {"transactions": 25, "farm": 15, "production": 25, "offtake":
 MOISTURE_OK = (25.0, 55.0)
 PH_OK = (5.5, 7.5)
 SOIL_TEMP_OK = (15.0, 35.0)
+
+
+MONTHS = {
+    "en": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+    "sw": ["Januari", "Februari", "Machi", "Aprili", "Mei", "Juni", "Julai", "Agosti", "Septemba", "Oktoba", "Novemba", "Desemba"],
+}
+
+
+def _month_name(ym: str) -> dict[str, str]:
+    """"2027-03" -> {"en": "March 2027", "sw": "Machi 2027"}."""
+    year, month = ym.split("-")
+    return {lang: f"{names[int(month) - 1]} {year}" for lang, names in MONTHS.items()}
+
+
+def _gather(session: Session, farmer: Farmer) -> dict[str, Any]:
+    """Everything the farmer has done on the platform that the assessment looks at."""
+    farm_rows = list(session.exec(select(Farm).where(Farm.farmer_id == farmer.id)))
+    ids = [f.id for f in farm_rows]
+    advice_rows = list(session.exec(select(IrrigationAdvice).where(IrrigationAdvice.farm_id.in_(ids)))) if ids else []  # type: ignore[union-attr]
+    actionable_rows = [a for a in advice_rows if a.action in ("IRRIGATE", "SKIP_RAIN") and a.followed is not None]
+    batch_rows = list(session.exec(select(CropBatch).where(CropBatch.farmer_id == farmer.id)))
+    harvest_ids = [b.harvest_id for b in batch_rows]
+    return {
+        "farms": farm_rows,
+        "crops": list(session.exec(select(Crop).where(Crop.farm_id.in_(ids)))) if ids else [],  # type: ignore[union-attr]
+        "actionable": actionable_rows,
+        "followed": sum(1 for a in actionable_rows if a.followed),
+        "sales": list(session.exec(select(Sale).where(Sale.farmer_id == farmer.id, Sale.completed_at.is_not(None)))),  # type: ignore[union-attr]
+        "receipts": list(session.exec(select(WarehouseReceipt).where(WarehouseReceipt.owner_farmer_id == farmer.id))),
+        "harvests": list(session.exec(select(Harvest).where(Harvest.id.in_(harvest_ids)))) if harvest_ids else [],  # type: ignore[union-attr]
+        "storage_alerts": list(
+            session.exec(
+                select(Alert).where(
+                    Alert.user_id == farmer.user_id,
+                    Alert.kind == "SPOILAGE_RISK",
+                    Alert.severity == "CRITICAL",
+                    Alert.resolved_at.is_(None),  # type: ignore[union-attr]
+                )
+            )
+        ),
+    }
+
+
+def ai_features(session: Session, farmer: Farmer, g: dict[str, Any], flow: dict[str, Any], offtake: dict, condition: dict) -> dict[str, float]:
+    """The farmer's activities and transactions as the model's raw inputs."""
+    from ..models import AuditLog, LoanApplication, SavingsGoal, User, utcnow
+
+    loans = list(session.exec(select(LoanApplication).where(LoanApplication.farmer_id == farmer.id)))
+    per_season: dict[int, float] = {}
+    for h in g["harvests"]:
+        per_season[h.harvest_date.year] = per_season.get(h.harvest_date.year, 0) + h.quantity_kg
+    amounts = list(per_season.values())
+    if len(amounts) >= 2 and sum(amounts):
+        mean = sum(amounts) / len(amounts)
+        consistency = max(0.0, 1 - (sum((a - mean) ** 2 for a in amounts) / len(amounts)) ** 0.5 / mean)
+    else:
+        consistency = 0.5  # unknown with fewer than two seasons
+    actionable_rows = g["actionable"]
+    user = session.get(User, farmer.user_id)
+    since = utcnow() - timedelta(days=90)
+    activity = session.exec(select(AuditLog.id).where(AuditLog.actor_user_id == farmer.user_id, AuditLog.ts >= since)).all()
+    drought = farmer.region.strip().lower() in DROUGHT_PRONE_REGIONS
+    return {
+        "sales_count": len(g["sales"]),
+        "sales_income": sum(x.amount for x in g["sales"]),
+        "distinct_buyers": len({x.buyer_id for x in g["sales"]}),
+        "selling_months": len({x.completed_at.strftime("%Y-%m") for x in g["sales"] if x.completed_at}),
+        "savings": sum(x.saved_amount for x in session.exec(select(SavingsGoal).where(SavingsGoal.farmer_id == farmer.id))),
+        "loans_repaid": sum(1 for x in loans if x.status == "CLOSED"),
+        "loans_open": sum(1 for x in loans if x.status in ("DISBURSED", "REPAYING")),
+        "seasons": len(per_season),
+        "harvest_kg": sum(amounts),
+        "harvest_consistency": consistency,
+        "ghala_receipts": len(g["receipts"]),
+        "storage_alerts": len(g["storage_alerts"]),
+        "advice_follow_rate": g["followed"] / len(actionable_rows) if len(actionable_rows) >= 3 else 0.5,
+        "acres": sum(f.acreage for f in g["farms"]),
+        "drought_rainfed": 1.0 if drought and not any(f.irrigation_type != "rainfed" for f in g["farms"]) else 0.0,
+        "offtake_coverage": float(offtake["facts"].get("coverage") or (1.0 if offtake["facts"].get("active_contracts") else 0.0)),
+        "soil_condition": condition["score"] / 100,
+        "account_age": _record_days(user, g),
+        "activity_90d": len(activity),
+        "coming_harvest": 1.0 if flow.get("expected_income_range_tzs") else 0.0,
+    }
+
+
+def _record_days(user, g: dict[str, Any]) -> int:
+    """How long the farmer has a track record: from the earliest of account, farm, harvest or sale."""
+    from datetime import datetime
+
+    from ..models import utcnow
+
+    starts = [user.created_at] if user else []
+    starts += [f.created_at for f in g["farms"]]
+    starts += [datetime.combine(h.harvest_date, datetime.min.time(), tzinfo=utcnow().tzinfo) for h in g["harvests"]]
+    starts += [x.completed_at for x in g["sales"] if x.completed_at]
+    starts = [d if d.tzinfo else d.replace(tzinfo=utcnow().tzinfo) for d in starts]
+    return max(0, (utcnow() - min(starts)).days) if starts else 0
+
+
+def _feature_label(name: str, raw: dict[str, float]) -> dict[str, str]:
+    v = raw[name]
+    if name in ("drought_rainfed", "coming_harvest"):
+        return bi(f"ai.f.{name}_{int(v)}")
+    if name in ("harvest_consistency", "advice_follow_rate", "offtake_coverage"):
+        return bi(f"ai.f.{name}", v=f"{round(v * 100)}%")
+    if name == "soil_condition":
+        return bi("ai.f.soil_condition", v=round(v * 100))
+    if name in ("sales_income", "savings"):
+        return bi(f"ai.f.{name}", v=round(v, -3))
+    if name == "acres":
+        return bi("ai.f.acres", v=round(v, 1))
+    return bi(f"ai.f.{name}", v=int(round(v)))
+
+
+def _real_outcomes(session: Session) -> list[tuple[list[float], int]]:
+    """Loans repaid on the platform (CLOSED) become real training examples."""
+    from ..models import LoanApplication
+    from . import credit_model
+
+    out = []
+    repaid = {x.farmer_id for x in session.exec(select(LoanApplication).where(LoanApplication.status == "CLOSED"))}
+    for farmer_id in sorted(repaid):
+        other = session.get(Farmer, farmer_id)
+        if not other:
+            continue
+        g = _gather(session, other)
+        flow = cash_flow(session, other, g["sales"])
+        offtake = _offtake(session, other, flow.get("expected_yield_kg"))
+        condition = _condition(session, g["farms"], g["actionable"], g["followed"])
+        out.append((credit_model.to_vector(ai_features(session, other, g, flow, offtake, condition)), 1))
+    return out
+
+
+def ai_eligibility(session: Session, raw: dict[str, float]) -> dict[str, Any]:
+    """The model's verdict: probability of repaying, eligible or not, and why."""
+    from . import credit_model
+
+    model = credit_model.get_model(_real_outcomes(session))
+    result = credit_model.predict(model, raw)
+    ranked = sorted(result["contributions"].items(), key=lambda kv: kv[1])
+    helped = [{"key": k, "label": _feature_label(k, raw), "impact": v} for k, v in reversed(ranked) if v > 0.05][:4]
+    held_back = [{"key": k, "label": _feature_label(k, raw), "impact": v, "tip": bi(f"ai.tip.{k}")} for k, v in ranked if v < -0.05][:4]
+    return {
+        "eligible": result["eligible"],
+        "probability": result["probability"],
+        "threshold": credit_model.THRESHOLD,
+        "helped": helped,
+        "held_back": held_back,
+        "model": model.card,
+    }
 
 
 def _level(score: float) -> str:
@@ -311,29 +462,9 @@ def _condition(session: Session, farms: list[Farm], actionable: list[IrrigationA
 def build_profile(session: Session, farmer: Farmer) -> FarmerRiskProfile:
     """Credit assessment on five criteria: transaction history, farm size and location,
     production history, off-take contracts and farm condition (IoT/AI)."""
-    farms = list(session.exec(select(Farm).where(Farm.farmer_id == farmer.id)))
-    farm_ids = [f.id for f in farms]
-    crops = list(session.exec(select(Crop).where(Crop.farm_id.in_(farm_ids)))) if farm_ids else []  # type: ignore[union-attr]
-    advice = list(session.exec(select(IrrigationAdvice).where(IrrigationAdvice.farm_id.in_(farm_ids)))) if farm_ids else []  # type: ignore[union-attr]
-    actionable = [a for a in advice if a.action in ("IRRIGATE", "SKIP_RAIN") and a.followed is not None]
-    followed = sum(1 for a in actionable if a.followed)
-    sales = list(
-        session.exec(select(Sale).where(Sale.farmer_id == farmer.id, Sale.completed_at.is_not(None)))  # type: ignore[union-attr]
-    )
-    receipts = list(session.exec(select(WarehouseReceipt).where(WarehouseReceipt.owner_farmer_id == farmer.id)))
-    batches = list(session.exec(select(CropBatch).where(CropBatch.farmer_id == farmer.id)))
-    harvest_ids = [b.harvest_id for b in batches]
-    harvests = list(session.exec(select(Harvest).where(Harvest.id.in_(harvest_ids)))) if harvest_ids else []  # type: ignore[union-attr]
-    storage_alerts = list(
-        session.exec(
-            select(Alert).where(
-                Alert.user_id == farmer.user_id,
-                Alert.kind == "SPOILAGE_RISK",
-                Alert.severity == "CRITICAL",
-                Alert.resolved_at.is_(None),  # type: ignore[union-attr]
-            )
-        )
-    )
+    g = _gather(session, farmer)
+    farms, crops, actionable, followed = g["farms"], g["crops"], g["actionable"], g["followed"]
+    sales, receipts, harvests, storage_alerts = g["sales"], g["receipts"], g["harvests"], g["storage_alerts"]
 
     kg_sold = sum(s.quantity_kg for s in sales)
     sold_price = (sum(s.amount for s in sales) / kg_sold) if kg_sold else None
@@ -350,22 +481,29 @@ def build_profile(session: Session, farmer: Farmer) -> FarmerRiskProfile:
         _condition(session, farms, actionable, followed),
     ]
     score = sum(c["score"] * c["weight"] for c in criteria) / sum(c["weight"] for c in criteria)
-    band = "LOW" if score >= 70 else "MEDIUM" if score >= 50 else "HIGH"
+    # The AI model decides eligibility from the farmer's activities and transactions; the
+    # overall health band follows the same prediction so the page tells one story.
+    raw = ai_features(session, farmer, g, flow, criteria[3], criteria[4])
+    loan = ai_eligibility(session, raw)
+    p = loan["probability"]
+    band = "LOW" if p >= 0.7 else "MEDIUM" if p >= loan["threshold"] else "HIGH"
     positive = [f["text"] for c in criteria for f in c["findings"] if f["good"]]
     risks = [f["text"] for c in criteria for f in c["findings"] if not f["good"]]
     drought = bool(criteria[1]["facts"].get("drought_prone"))
 
     products: list[dict[str, Any]] = []
-    if flow.get("expected_income_range_tzs"):
-        low = flow["expected_income_range_tzs"][0]
-        # A buyer contract for at least half the harvest makes repayment more certain.
-        share = 0.4 if (criteria[3]["facts"].get("coverage") or 0) >= 0.5 else 0.3
+    # Limit: a share of the coming harvest's income (or, without one, the verified sales so
+    # far) that grows with the predicted probability of repaying.
+    base = flow["expected_income_range_tzs"][0] if flow.get("expected_income_range_tzs") else raw["sales_income"]
+    if loan["eligible"] and base > 0:
+        month = flow.get("next_harvest_month")
         products.append(
             {
                 "type": "input_loan",
-                "max_amount_tzs": round(low * share, -3),
-                "repayment_month": flow["next_harvest_month"],
-                "reason": bi("profile.product.input_loan", month=flow["next_harvest_month"]),
+                "max_amount_tzs": round(base * (0.15 + 0.35 * p), -3),
+                "repayment_month": month,
+                "probability": p,
+                "reason": bi("profile.product.input_loan", month=_month_name(month)) if month else bi("profile.product.input_loan_sales"),
             }
         )
     if drought:
@@ -388,6 +526,8 @@ def build_profile(session: Session, farmer: Farmer) -> FarmerRiskProfile:
         suggested_products=products,
         inputs={
             "criteria": criteria,
+            "eligibility": loan,
+            "ai_features": raw,
             "advice_actionable": len(actionable),
             "advice_followed": followed,
             "verified_sales": len(sales),
@@ -486,6 +626,7 @@ def profile_json(p: FarmerRiskProfile, farmer: Farmer, evidence: dict[str, Any] 
         "cash_flow_estimate": p.cash_flow,
         "suggested_products": p.suggested_products,
         "criteria": p.inputs.get("criteria", []),
+        "eligibility": p.inputs.get("eligibility"),
         "inputs": p.inputs,
         "disclaimer": bi("profile.disclaimer"),
     }

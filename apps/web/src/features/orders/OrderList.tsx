@@ -1,12 +1,24 @@
-import { Check, MessageSquare, Phone, ShieldCheck } from 'lucide-react'
+import { Check, MessageSquare, Phone, ShieldCheck, Smartphone } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { ConfirmAction } from '../../components/ConfirmAction'
 import { CropImage } from '../../components/crops'
-import { Button, Card, EmptyState, ErrorNote, SimulatedTag, StatusBadge, cx, useToast } from '../../components/ui'
+import { Badge, Button, Card, EmptyState, ErrorNote, SimulatedTag, StatusBadge, cx, useToast } from '../../components/ui'
 import { ApiError, api } from '../../lib/api'
 import { useApi, useErrorText, useFormat } from '../../lib/hooks'
+import { PayDialog } from './PayDialog'
+
+export type Payment = {
+  id: number
+  provider: 'simulated' | 'snippe'
+  reference: string | null
+  amount: number
+  phone: string
+  status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'EXPIRED' | 'VOIDED'
+  failure_reason: string | null
+  created_at: string
+} | null
 
 export type Order = {
   id: number
@@ -25,6 +37,8 @@ export type Order = {
   warehouse: { name: string; region: string } | null
   sale: { id: string; confirmed_by_farmer_at: string | null; confirmed_by_buyer_at: string | null; completed_at: string | null } | null
   my_role: 'farmer' | 'buyer' | 'warehouse' | 'admin'
+  payment: Payment
+  payment_mode: 'simulated' | 'snippe'
 }
 
 const FLOW = ['REQUESTED', 'ACCEPTED', 'PAID', 'RELEASED', 'DELIVERED', 'SALE_CONFIRMED']
@@ -55,7 +69,10 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
   const [error, setError] = useState<string | null>(null)
   const [confirming, setConfirming] = useState<string | null>(null)
   const [chatOpen, setChatOpen] = useState(false)
+  const [paying, setPaying] = useState(false)
   const role = order.my_role
+  const live = order.payment?.provider === 'snippe'
+  const payPending = live && order.payment?.status === 'PENDING'
 
   const act = async (action: string, pin?: string) => {
     setBusy(action)
@@ -74,11 +91,14 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
     }
   }
 
-  const start = (action: string) => (action === 'pay' && order.total > STEP_UP_TZS ? setConfirming(action) : act(action))
+  const start = (action: string) => {
+    if (action === 'pay' && order.payment_mode === 'snippe') return setPaying(true)
+    return action === 'pay' && order.total > STEP_UP_TZS ? setConfirming(action) : act(action)
+  }
 
   const actions: { id: string; label: string; variant?: 'primary' | 'secondary' | 'danger' }[] = []
   if (role === 'farmer' && order.status === 'REQUESTED') actions.push({ id: 'accept', label: t('orders.accept') }, { id: 'decline', label: t('orders.decline'), variant: 'secondary' })
-  if (role === 'buyer' && order.status === 'ACCEPTED') actions.push({ id: 'pay', label: t('orders.pay', { amount: f.tzs(order.total) }) })
+  if (role === 'buyer' && order.status === 'ACCEPTED') actions.push({ id: 'pay', label: payPending ? t('pay.checkPayment') : t('orders.pay', { amount: f.tzs(order.total) }) })
   if (role === 'warehouse' && order.status === 'PAID') actions.push({ id: 'release', label: t('orders.release', { kg: f.kg(order.quantity_kg) }) })
   if (role === 'buyer' && order.status === 'RELEASED') actions.push({ id: 'deliver', label: t('orders.deliver') })
   if (order.sale && !order.sale.completed_at) {
@@ -143,9 +163,14 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
               )}
             </p>
           )}
+          {payPending && (
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-harvest-800">
+              <Smartphone className="size-3.5" aria-hidden /> {t('pay.pendingLine', { phone: order.payment!.phone })}
+            </p>
+          )}
           {order.payment_ref && (
             <p className="mt-1 flex items-center gap-2 text-xs text-muted">
-              {t('orders.paymentRef')}: <span className="num font-mono">{order.payment_ref}</span> <SimulatedTag />
+              {t('orders.paymentRef')}: <span className="num font-mono">{order.payment_ref}</span> {live ? <Badge tone="green">{t('pay.viaSnippe')}</Badge> : <SimulatedTag />}
             </p>
           )}
         </div>
@@ -177,6 +202,7 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
         </div>
       )}
       {chatOpen && <Chat orderId={order.id} />}
+      {paying && <PayDialog order={order} open={paying} onClose={() => (setPaying(false), onChanged())} onPaid={() => (setPaying(false), onChanged())} />}
       <ConfirmAction
         open={confirming != null}
         title={t('orders.confirmPaymentTitle')}

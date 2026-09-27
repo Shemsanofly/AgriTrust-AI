@@ -1,4 +1,4 @@
-import { CheckCircle2, CircleDashed, CloudRain, FileText, HandCoins, Umbrella, Warehouse } from 'lucide-react'
+import { BrainCircuit, CheckCircle2, CircleDashed, CloudRain, FileText, HandCoins, Lightbulb, TrendingDown, TrendingUp, Umbrella, Warehouse } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ConfirmAction } from '../../components/ConfirmAction'
@@ -22,6 +22,8 @@ import {
 import { api } from '../../lib/api'
 import { useApi, useBi, useErrorText, useFormat, type Bi } from '../../lib/hooks'
 import type { Batch } from '../farmer/shared'
+import { HazardForecast } from './HazardForecast'
+import { DocumentList, DocumentPicker, type LoanDoc } from './LoanDocuments'
 import type { Profile } from './ProfileView'
 
 export function ContestProfile() {
@@ -77,6 +79,7 @@ type Loan = {
   created_at: string
   lender: { id: number; name: string }
   terms: { interest_rate_pct?: number; tenor_months?: number }
+  documents: LoanDoc[]
 }
 
 const LOAN_STEPS = ['SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'DISBURSED', 'REPAYING', 'CLOSED']
@@ -98,6 +101,7 @@ export function LoansTab({ profile }: { profile: Profile | null }) {
   const { data: lenders } = useApi<{ id: number; name: string }[]>('/partners?role=LENDER')
   const suggestion = profile?.suggested_products.find((p) => p.type === 'input_loan')
   const [form, setForm] = useState({ lender: '', amount: '', purpose: '', month: '' })
+  const [docs, setDocs] = useState<LoanDoc[]>([])
   const [confirm, setConfirm] = useState(false)
   const [touched, setTouched] = useState(false)
   const amount = Number(form.amount.replace(/[, ]/g, ''))
@@ -106,15 +110,11 @@ export function LoansTab({ profile }: { profile: Profile | null }) {
   const problems = {
     amount: !(amount > 0) ? t('validation.amount') : null,
     purpose: form.purpose.trim().length < 3 ? t('validation.purpose') : null,
+    document: docs.length ? null : t('loanDocs.required'),
   }
   const overMax = suggestion?.max_amount_tzs != null && amount > suggestion.max_amount_tzs
 
-  const eligibility: [boolean, string][] = [
-    [(profile?.inputs.verified_sales ?? 0) > 0, t('loans.elig.sales', { count: profile?.inputs.verified_sales ?? 0 })],
-    [(profile?.inputs.receipts ?? 0) > 0, t('loans.elig.receipts')],
-    [(profile?.inputs.advice_actionable ?? 0) >= 3, t('loans.elig.activity')],
-    [Boolean(profile?.cash_flow_estimate.expected_income_range_tzs), t('loans.elig.cashflow')],
-  ]
+  const elig = profile?.eligibility
 
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_1.1fr]">
@@ -141,16 +141,8 @@ export function LoansTab({ profile }: { profile: Profile | null }) {
           ) : (
             <p className="text-sm text-muted">{t('loans.noProduct')}</p>
           )}
-          <h3 className="mt-5 text-sm font-semibold">{t('loans.eligibility')}</h3>
-          <ul className="mt-2 space-y-1.5 text-[13px]">
-            {eligibility.map(([ok, text]) => (
-              <li key={text} className="flex items-center gap-2">
-                {ok ? <CheckCircle2 className="size-4 text-forest-700" aria-hidden /> : <CircleDashed className="size-4 text-muted" aria-hidden />}
-                <span className={ok ? 'text-ink' : 'text-muted'}>{text}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 text-xs text-muted">{t('loans.eligibilityNote')}</p>
+          {elig && <AiVerdict elig={elig} />}
+          {!elig && <p className="mt-3 text-xs text-muted">{t('loans.eligibilityNote')}</p>}
         </Card>
 
         <Card title={t('loans.applyTitle')}>
@@ -183,6 +175,7 @@ export function LoansTab({ profile }: { profile: Profile | null }) {
             <Field label={t('loans.purpose')} error={touched ? problems.purpose : null}>
               <input className="input" value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} placeholder={t('loans.purposePlaceholder')} />
             </Field>
+            <DocumentPicker docs={docs} onChange={setDocs} error={touched ? problems.document : null} />
             <Notice tone="neutral">{t('loans.consentNote')}</Notice>
             <Button type="submit">{t('loans.review')}</Button>
           </form>
@@ -218,6 +211,11 @@ export function LoansTab({ profile }: { profile: Profile | null }) {
                         </li>
                       ))}
                     </ol>
+                  )}
+                  {l.documents?.length > 0 && (
+                    <div className="mt-3">
+                      <DocumentList docs={l.documents} />
+                    </div>
                   )}
                   {l.decision_reason && (
                     <p className="mt-3 rounded-md bg-sunken px-3 py-2 text-[13px]">
@@ -262,14 +260,16 @@ export function LoansTab({ profile }: { profile: Profile | null }) {
           [t('loans.amount'), f.tzs(amount)],
           [t('loans.purpose'), form.purpose],
           [t('loans.repaymentMonth'), month ? f.month(month) : '—'],
+          [t('loanDocs.title'), docs.map((d) => t(`loanDocs.types.${d.doc_type}`)).join(', ')],
           [t('loans.sharedData'), t('loans.sharedDataValue')],
         ]}
         note={t('loans.decisionNote')}
         confirmLabel={t('loans.submit')}
         onClose={() => setConfirm(false)}
         onConfirm={async (pin) => {
-          await api('/loans', { method: 'POST', body: { lender_user_id: lender?.id, amount, purpose: form.purpose.trim(), repayment_month: month || null, confirm_pin: pin } })
+          await api('/loans', { method: 'POST', body: { lender_user_id: lender?.id, amount, purpose: form.purpose.trim(), repayment_month: month || null, confirm_pin: pin, document_ids: docs.map((d) => d.id) } })
           setForm({ lender: '', amount: '', purpose: '', month: '' })
+          setDocs([])
           setTouched(false)
           toast(t('loans.submitted'))
           reload()
@@ -329,6 +329,7 @@ export function InsuranceTab({ profile }: { profile: Profile | null }) {
 
   return (
     <div className="space-y-5">
+      <HazardForecast onInsurance={() => document.getElementById('insurance-recs')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
       <div className="grid gap-5 lg:grid-cols-2">
         <Card title={t('insurance.riskTitle')} subtitle={t('insurance.riskSub')}>
           <ul className="space-y-3 text-sm">
@@ -350,6 +351,7 @@ export function InsuranceTab({ profile }: { profile: Profile | null }) {
             </li>
           </ul>
         </Card>
+        <div id="insurance-recs" className="scroll-mt-4">
         <Card title={t('insurance.recommendations')} actions={<SimulatedTag label={t('insurance.simulatedInsurer')} />}>
           {!recs ? (
             <Skeleton className="h-24" />
@@ -375,6 +377,7 @@ export function InsuranceTab({ profile }: { profile: Profile | null }) {
             </ul>
           )}
         </Card>
+        </div>
       </div>
 
       <Card title={t('insurance.myPolicies')}>
@@ -461,6 +464,76 @@ export function InsuranceTab({ profile }: { profile: Profile | null }) {
           reload()
         }}
       />
+    </div>
+  )
+}
+
+/** The AI model's loan verdict: probability of repaying, and the farmer's own activities that
+ * pushed it up or down (the model's per-feature contributions), with a tip for each weakness. */
+function AiVerdict({ elig }: { elig: NonNullable<Profile['eligibility']> }) {
+  const { t } = useTranslation()
+  const bi = useBi()
+  const pct = Math.round(elig.probability * 100)
+  return (
+    <div className="mt-5 space-y-4">
+      <div className={cx('rounded-md px-3 py-3', elig.eligible ? 'bg-forest-50 text-forest-900' : 'bg-warn-100 text-warn-700')}>
+        <div className="flex items-start gap-3">
+          <BrainCircuit className="mt-0.5 size-5 shrink-0" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-medium">{t('ai.prediction')}</div>
+            <div className="text-lg font-semibold">{t('ai.likely', { pct })}</div>
+            <div className="text-sm">{elig.eligible ? t('ai.eligibleYes') : t('ai.eligibleNo')}</div>
+          </div>
+        </div>
+        <div className="relative mt-3 h-2 rounded-full bg-white/70" role="img" aria-label={t('ai.likely', { pct })}>
+          <div className={cx('h-full rounded-full', elig.eligible ? 'bg-forest-700' : 'bg-warn-700')} style={{ width: `${pct}%` }} />
+          <div className="absolute -top-1 h-4 w-0.5 bg-ink/60" style={{ left: `${elig.threshold * 100}%` }} title={t('ai.threshold', { pct: elig.threshold * 100 })} />
+        </div>
+        <div className="mt-1 text-[11px] opacity-80">{t('ai.threshold', { pct: elig.threshold * 100 })}</div>
+      </div>
+
+      {elig.helped.length > 0 && (
+        <div>
+          <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+            <TrendingUp className="size-4 text-forest-700" aria-hidden /> {t('ai.helped')}
+          </h3>
+          <ul className="mt-1.5 space-y-1 text-[13px] text-ink-soft">
+            {elig.helped.map((f) => (
+              <li key={f.key} className="flex gap-2">
+                <CheckCircle2 className="mt-px size-4 shrink-0 text-forest-700" aria-hidden />
+                {bi(f.label)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {elig.held_back.length > 0 && (
+        <div>
+          <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+            <TrendingDown className="size-4 text-warn-700" aria-hidden /> {t('ai.heldBack')}
+          </h3>
+          <ul className="mt-1.5 divide-y divide-line text-[13px]">
+            {elig.held_back.map((f) => (
+              <li key={f.key} className="py-2">
+                <div className="flex gap-2 text-ink">
+                  <CircleDashed className="mt-px size-4 shrink-0 text-warn-700" aria-hidden />
+                  {bi(f.label)}
+                </div>
+                <div className="mt-0.5 flex gap-1.5 pl-6 text-harvest-800">
+                  <Lightbulb className="mt-px size-3.5 shrink-0" aria-hidden />
+                  <span>{bi(f.tip)}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <p className="text-[11px] text-muted">
+        {t('ai.modelCard', { model: elig.model.name, n: elig.model.trained_on.toLocaleString(), auc: Math.round(elig.model.auc * 100), real: elig.model.real_outcomes })}
+        {elig.model.simulated && <> {t('ai.simulatedData')}</>}
+      </p>
     </div>
   )
 }

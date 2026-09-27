@@ -1,8 +1,12 @@
+import json
+import logging
+import math
 import secrets
 from datetime import date, timedelta
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
@@ -12,6 +16,7 @@ from ..chain.records import anchor_entity, verify_entity
 from ..config import get_settings, public_web_url
 from ..db import get_session
 from ..i18n import bi
+from ..integrations import snippe
 from ..integrations.payments_mock import simulate_payment
 from ..models import (
     Buyer,
@@ -19,6 +24,7 @@ from ..models import (
     Farmer,
     Order,
     OrderMessage,
+    PaymentIntent,
     Role,
     Sale,
     StorageRecord,
@@ -32,9 +38,11 @@ from ..security.auth import buyer_for, farmer_for, get_current_user, require_pin
 from ..storage import batch_risk, ghala_series
 from .batches import release_stock
 
+log = logging.getLogger(__name__)
 router = APIRouter(tags=["sokoni"])
 
 RISK_ORDER = {"LOW": 0, "MEDIUM": 1, "UNKNOWN": 2, "HIGH": 3}
+MIN_MARKET_KG = 5
 
 
 class OrderIn(BaseModel):
@@ -46,6 +54,10 @@ class OrderIn(BaseModel):
 class OrderAction(BaseModel):
     action: Literal["accept", "decline", "cancel", "pay", "release", "deliver"]
     confirm_pin: Optional[str] = None
+    # Live payments: the mobile-money number that gets the USSD prompt (default: the buyer's).
+    phone: Optional[str] = Field(default=None, pattern=r"^\+?[0-9]{9,15}$")
+    # Snippe requires the payer's email; saved to the profile when the user has none yet.
+    email: Optional[str] = Field(default=None, max_length=120, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 class MessageIn(BaseModel):
@@ -133,7 +145,8 @@ def listings(
     user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    query = select(CropBatch).where(CropBatch.listed == True, CropBatch.available_kg > 0)  # noqa: E712
+    # Leftovers under MIN_MARKET_KG stay with the farmer and don't clutter the marketplace.
+    query = select(CropBatch).where(CropBatch.listed == True, CropBatch.available_kg >= MIN_MARKET_KG)  # noqa: E712
     if crop:
         query = query.where(CropBatch.crop_type == crop)
     if grade:
@@ -208,7 +221,119 @@ def order_json(session: Session, order: Order, viewer: User) -> dict:
         "warehouse": {"name": wh.name, "region": wh.region} if wh else None,
         "sale": sale.model_dump(mode="json", exclude={"salt"}) if sale else None,
         "my_role": user_role_in_order(session, viewer, order),
+        "payment": intent_json(latest_intent(session, order.id)),
+        "payment_mode": get_settings().payments_provider,
     }
+
+
+# ---------------------------------------------------------------- payments
+
+
+def latest_intent(session: Session, order_id: int) -> Optional[PaymentIntent]:
+    return session.exec(select(PaymentIntent).where(PaymentIntent.order_id == order_id).order_by(PaymentIntent.id.desc())).first()  # type: ignore[union-attr]
+
+
+def intent_json(intent: Optional[PaymentIntent]) -> Optional[dict]:
+    if not intent:
+        return None
+    return {
+        "id": intent.id,
+        "provider": intent.provider,
+        "reference": intent.reference,
+        "amount": intent.amount,
+        "phone": intent.phone,
+        "status": intent.status,
+        "failure_reason": intent.failure_reason,
+        "created_at": intent.created_at.isoformat(),
+    }
+
+
+def mark_paid(session: Session, order: Order, reference: str) -> None:
+    """Money confirmed: the order moves to PAID and everyone involved is told."""
+    batch, farmer, buyer, wh = order_parties(session, order)
+    order.payment_ref = reference
+    order.status = "PAID"
+    order.updated_at = utcnow()
+    session.add(order)
+    for uid in {farmer.user_id, buyer.user_id} | ({wh.operator_user_id} if wh else set()):
+        notify(session, session.get(User, uid), "ORDER", bi("alert.order_status", order=order.id, status="PAID"), entity_type="ORDER", entity_id=str(order.id))
+
+
+SNIPPE_STATUS = {"completed": "COMPLETED", "failed": "FAILED", "expired": "EXPIRED", "voided": "VOIDED", "pending": "PENDING"}
+
+
+def apply_payment_status(session: Session, intent: PaymentIntent, provider_status: str, data: dict) -> None:
+    """Apply Snippe's verdict once. Final states never change again (webhooks can repeat)."""
+    new = SNIPPE_STATUS.get((provider_status or "").lower())
+    if not new or intent.status != "PENDING" or new == "PENDING":
+        return
+    amount = data.get("amount")
+    paid = amount.get("value") if isinstance(amount, dict) else amount
+    if new == "COMPLETED" and paid is not None and int(paid) < intent.amount:
+        new, data = "FAILED", {**data, "failure_reason": f"amount_mismatch: paid {paid}, expected {intent.amount}"}
+    intent.status = new
+    session.add(intent)
+    order = session.get(Order, intent.order_id)
+    if new == "COMPLETED":
+        intent.completed_at = utcnow()
+        if order and order.status == "ACCEPTED":
+            mark_paid(session, order, intent.reference or f"SNIPPE-{intent.id}")
+    else:
+        intent.failure_reason = data.get("failure_reason") or new.lower()
+        if order:
+            _, _, buyer, _ = order_parties(session, order)
+            notify(session, session.get(User, buyer.user_id), "ORDER", bi("alert.payment_failed", order=order.id, reason=intent.failure_reason), severity="WARNING", entity_type="ORDER", entity_id=str(order.id))
+
+
+class PaymentRefused(Exception):
+    """Snippe refused to start the payment; the message is Snippe's own reason."""
+
+
+def start_live_payment(session: Session, order: Order, user: User, phone: Optional[str], email: Optional[str] = None) -> PaymentIntent:
+    """Snippe USSD push to the payer. The order stays ACCEPTED until Snippe confirms."""
+    pending = latest_intent(session, order.id)
+    if pending and pending.status == "PENDING":
+        raise HTTPException(status.HTTP_409_CONFLICT, "payment_pending")
+    amount = math.ceil(order.quantity_kg * order.price_per_kg)
+    if amount < snippe.MIN_AMOUNT_TZS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "amount_too_small")
+    email = (email or user.email or "").strip()
+    if not email:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "email_required")
+    base = public_web_url()
+    if not base.startswith("https://"):
+        # Snippe requires a public https webhook address (PUBLIC_WEB_URL, e.g. the ngrok link).
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "payment_setup_incomplete")
+    if not user.email:
+        user.email = email
+        session.add(user)
+    intent = PaymentIntent(order_id=order.id, provider="snippe", amount=amount, phone=phone or user.phone)
+    session.add(intent)
+    session.flush()
+    names = (user.full_name or "Buyer").split()
+    try:
+        data = snippe.create_mobile_payment(
+            amount_tzs=amount,
+            phone=intent.phone,
+            firstname=names[0],
+            lastname=" ".join(names[1:]) or names[0],
+            email=email,
+            # Through the web server, /api/... reaches this API (see vite proxy).
+            webhook_url=f"{base}/api/payments/snippe/webhook",
+            metadata={"order_id": str(order.id), "batch_id": order.batch_id},
+            idempotency_key=f"agt-o{order.id}-p{intent.id}",
+        )
+    except snippe.SnippeError as err:
+        log.warning("Snippe payment for order %s failed: %s (%s)", order.id, err.message, err.error_code)
+        intent.status, intent.failure_reason = "FAILED", err.message
+        session.add(intent)
+        session.commit()
+        raise PaymentRefused(err.message) from err
+    intent.reference = data.get("reference")
+    session.add(intent)
+    apply_payment_status(session, intent, data.get("status", "pending"), data)
+    session.commit()
+    return intent
 
 
 def load_order(session: Session, order_id: int, user: User) -> Order:
@@ -306,7 +431,15 @@ def update_order(order_id: int, body: OrderAction, user: User = Depends(get_curr
         total = order.quantity_kg * order.price_per_kg
         if total > get_settings().step_up_threshold_tzs:
             require_pin(user, body.confirm_pin)
+        if get_settings().payments_provider == "snippe":
+            try:
+                start_live_payment(session, order, user, body.phone, body.email)
+            except PaymentRefused as err:
+                # Keep the usual error code, and pass Snippe's reason on so the payer sees it.
+                return JSONResponse({"detail": "payment_provider_error", "reason": str(err)}, status_code=status.HTTP_502_BAD_GATEWAY)
+            return order_json(session, order, user)
         order.payment_ref = simulate_payment(total, order.currency)["reference"]
+        session.add(PaymentIntent(order_id=order.id, provider="simulated", reference=order.payment_ref, amount=math.ceil(total), phone=user.phone, status="COMPLETED", completed_at=utcnow()))
     elif body.action == "release":
         receipt = session.exec(select(WarehouseReceipt).where(WarehouseReceipt.batch_id == batch.id)).first()
         if not receipt:
@@ -344,6 +477,42 @@ def update_order(order_id: int, body: OrderAction, user: User = Depends(get_curr
         notify(session, session.get(User, wh.operator_user_id), "ORDER", bi("alert.order_status", order=order.id, status=to_status), entity_type="ORDER", entity_id=str(order.id))
     session.commit()
     return order_json(session, order, user)
+
+
+@router.get("/orders/{order_id}/payment")
+def payment_status(order_id: int, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    """Latest payment attempt. A pending Snippe payment is re-checked with Snippe, so the
+    order still updates if the webhook cannot reach this server."""
+    order = load_order(session, order_id, user)
+    intent = latest_intent(session, order.id)
+    if intent and intent.provider == "snippe" and intent.status == "PENDING" and intent.reference:
+        try:
+            data = snippe.get_payment(intent.reference)
+            apply_payment_status(session, intent, data.get("status", ""), data)
+            session.commit()
+        except snippe.SnippeError as err:
+            log.warning("Snippe status check for %s failed: %s", intent.reference, err.message)
+    return {"payment": intent_json(intent), "order": order_json(session, order, user)}
+
+
+@router.post("/payments/snippe/webhook")
+async def snippe_webhook(request: Request, session: Session = Depends(get_session)):
+    """Snippe's signed payment events. Unsigned, forged or stale calls are refused."""
+    raw = await request.body()
+    if not snippe.verify_webhook(raw, request.headers.get("x-webhook-signature"), request.headers.get("x-webhook-timestamp")):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid_signature")
+    try:
+        event = json.loads(raw)
+    except ValueError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid_json")
+    data = event.get("data") or {}
+    intent = session.exec(select(PaymentIntent).where(PaymentIntent.reference == data.get("reference"))).first() if data.get("reference") else None
+    if not intent:
+        return {"received": True, "matched": False}  # not ours (e.g. another integration): acknowledge
+    status_value = data.get("status") or str(event.get("type", "")).removeprefix("payment.")
+    apply_payment_status(session, intent, status_value, data)
+    session.commit()
+    return {"received": True, "matched": True}
 
 
 @router.post("/sales/{sale_id}/confirm")

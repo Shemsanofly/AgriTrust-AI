@@ -2,6 +2,7 @@ import {
   Bell,
   Boxes,
   CloudSun,
+  FileBarChart,
   FileCheck2,
   FileSignature,
   FileText,
@@ -39,6 +40,7 @@ export const NAV: Record<Role, NavItem[]> = {
     { to: '/ghala', key: 'nav.ghala', icon: Warehouse },
     { to: '/market', key: 'nav.market', icon: Store },
     { to: '/finance', key: 'nav.finance', icon: Landmark },
+    { to: '/reports', key: 'nav.reports', icon: FileBarChart },
   ],
   BUYER: [
     { to: '/', key: 'nav.marketplace', icon: Store },
@@ -47,6 +49,7 @@ export const NAV: Record<Role, NavItem[]> = {
     { to: '/verified', key: 'nav.verifiedBatches', icon: ShieldCheck },
     { to: '/suppliers', key: 'nav.suppliers', icon: Users },
     { to: '/payments', key: 'nav.payments', icon: Wallet },
+    { to: '/reports', key: 'nav.reports', icon: FileBarChart },
   ],
   WAREHOUSE_OPERATOR: [
     { to: '/', key: 'nav.overview', icon: LayoutDashboard },
@@ -54,6 +57,7 @@ export const NAV: Record<Role, NavItem[]> = {
     { to: '/intake', key: 'nav.intake', icon: PackagePlus },
     { to: '/orders', key: 'nav.releases', icon: Truck },
     { to: '/alerts', key: 'nav.alerts', icon: Bell, badge: 'alerts' },
+    { to: '/reports', key: 'nav.reports', icon: FileBarChart },
   ],
   LENDER: [
     { to: '/', key: 'nav.overview', icon: LayoutDashboard },
@@ -61,12 +65,14 @@ export const NAV: Record<Role, NavItem[]> = {
     { to: '/applications', key: 'nav.applications', icon: FileText },
     { to: '/risk-profiles', key: 'nav.riskProfiles', icon: Gauge },
     { to: '/loans', key: 'nav.loans', icon: HandCoins },
+    { to: '/reports', key: 'nav.reports', icon: FileBarChart },
   ],
   INSURER: [
     { to: '/', key: 'nav.overview', icon: LayoutDashboard },
     { to: '/policies', key: 'nav.policies', icon: FileCheck2 },
     { to: '/farm-risk', key: 'nav.farmRisk', icon: CloudSun },
     { to: '/claims', key: 'nav.claims', icon: Umbrella },
+    { to: '/reports', key: 'nav.reports', icon: FileBarChart },
   ],
   ADMIN: [
     { to: '/', key: 'nav.overview', icon: LayoutDashboard },
@@ -75,5 +81,6 @@ export const NAV: Record<Role, NavItem[]> = {
     { to: '/users', key: 'nav.users', icon: Users },
     { to: '/sms', key: 'nav.sms', icon: MessageSquareText },
     { to: '/demo', key: 'nav.demoTools', icon: FlaskConical },
+    { to: '/reports', key: 'nav.reports', icon: FileBarChart },
   ],
 }

@@ -24,6 +24,7 @@ import {
 } from '../../components/ui'
 import { api } from '../../lib/api'
 import { useApi, useBi, useErrorText, useFormat, type Bi } from '../../lib/hooks'
+import { AddCropDialog, CropPhotos } from './CropExtras'
 import { MOISTURE_IDEAL, STAGES, seasonProgress, type Farm, type Weather } from './shared'
 
 type PlantingAdvice = {
@@ -309,6 +310,7 @@ function CropsCard({ farm, onChanged, fits }: { farm: Farm; onChanged: () => voi
   const errorText = useErrorText()
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
 
   const setStage = async (cropId: number, stage: string) => {
     setBusy(`${cropId}-${stage}`)
@@ -324,7 +326,14 @@ function CropsCard({ farm, onChanged, fits }: { farm: Farm; onChanged: () => voi
   }
 
   return (
-    <Card title={t('farm.cropsTitle')}>
+    <Card
+      title={t('farm.cropsTitle')}
+      actions={
+        <Button size="sm" variant="secondary" icon={Plus} onClick={() => setAdding(true)}>
+          {t('crop.add')}
+        </Button>
+      }
+    >
       <ErrorNote text={error} />
       {!farm.crops.length ? (
         <EmptyState compact title={t('farm.noCrops')} />
@@ -343,6 +352,7 @@ function CropsCard({ farm, onChanged, fits }: { farm: Farm; onChanged: () => voi
                     <div className="flex flex-wrap items-center gap-2 font-medium">
                       {t(`crops.${c.crop_type}`)}
                       {c.variety && <span className="text-sm font-normal text-muted">{c.variety}</span>}
+                      {c.acreage ? <span className="num text-sm font-normal text-muted">· {f.num(c.acreage, 1)} {t('farm.acres')}</span> : null}
                       {fit && <Badge tone={FIT_TONE[fit.fit]}>{t('farm.soilFit', { fit: bi(fit.fit_label) })}</Badge>}
                     </div>
                     <div className="text-xs text-muted">
@@ -376,12 +386,14 @@ function CropsCard({ farm, onChanged, fits }: { farm: Farm; onChanged: () => voi
                     })}
                   </div>
                 )}
+                <CropPhotos cropId={c.id} cropName={t(`crops.${c.crop_type}`)} photos={c.photos ?? []} onChanged={onChanged} />
               </li>
             )
           })}
         </ul>
       )}
       <p className="mt-3 text-xs text-muted">{t('farm.stageHint')}</p>
+      <AddCropDialog farm={farm} open={adding} onClose={() => setAdding(false)} onDone={() => (setAdding(false), onChanged())} />
     </Card>
   )
 }

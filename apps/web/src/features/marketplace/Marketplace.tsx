@@ -298,7 +298,12 @@ export function ListingDetail() {
 
   const qtyNum = Number(qty.replace(/[, ]/g, ''))
   const total = qtyNum * data.price_per_kg
-  const qtyError = qty && (!(qtyNum > 0) || qtyNum > data.available_kg) ? t('validation.qtyMax', { kg: f.kg(data.available_kg) }) : null
+  // Only complain when the buyer asks for more than is stored; the amount itself is shown as a hint.
+  const qtyError = !qty ? null : !(qtyNum > 0) ? t('validation.quantity') : qtyNum > data.available_kg ? t('validation.qtyMax', { kg: f.kg(data.available_kg) }) : null
+  // Quick-fill shares, rounded to 0.5 kg; shares that would be 0 kg are not offered.
+  const shares = [0.25, 0.5, 1]
+    .map((share) => ({ share, kg: share === 1 ? data.available_kg : Math.floor(data.available_kg * share * 2) / 2 }))
+    .filter((x) => x.kg > 0 && (x.share === 1 || x.kg < data.available_kg))
 
   const place = async (pin?: string) => {
     setBusy(true)
@@ -406,12 +411,12 @@ export function ListingDetail() {
         <div className="space-y-5">
           <Card title={t('market.requestPurchase')}>
             <form onSubmit={submit} className="space-y-4" noValidate>
-              <Field label={t('ghala.quantityKg')} error={qtyError}>
-                <input className="input num" inputMode="numeric" value={qty} onChange={(e) => setQty(e.target.value)} aria-invalid={Boolean(qtyError)} placeholder={String(Math.round(data.available_kg / 2))} />
+              <Field label={t('ghala.quantityKg')} error={qtyError} hint={t('market.availableHint', { kg: f.kg(data.available_kg) })}>
+                <input className="input num" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} aria-invalid={Boolean(qtyError)} placeholder={String(shares[0]?.kg ?? '')} />
               </Field>
               <div className="flex gap-2">
-                {[0.25, 0.5, 1].map((share) => (
-                  <button key={share} type="button" onClick={() => setQty(String(Math.floor(data.available_kg * share)))} className="min-h-9 flex-1 rounded-md border border-line-strong text-[13px] hover:bg-sunken">
+                {shares.map(({ share, kg }) => (
+                  <button key={share} type="button" onClick={() => setQty(String(kg))} className="min-h-9 flex-1 rounded-md border border-line-strong text-[13px] hover:bg-sunken">
                     {share === 1 ? t('market.all') : `${share * 100}%`}
                   </button>
                 ))}

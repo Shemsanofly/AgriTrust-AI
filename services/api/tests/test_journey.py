@@ -108,14 +108,19 @@ def test_full_demo_journey(client, login):
 
     assert client.get("/farmers/FMR-0042/profile", headers=lender).status_code == 403  # no consent yet
     lender_id = client.get("/partners?role=LENDER", headers=farmer).json()[0]["id"]
+    # A web application needs a supporting document (uploaded first).
+    no_doc = {"lender_user_id": lender_id, "amount": 400000, "purpose": "Seeds and fertiliser", "confirm_pin": "1234"}
+    assert client.post("/loans", json=no_doc, headers=farmer).json()["detail"] == "document_required"
+    doc = client.post("/loan-documents", files={"file": ("nida.pdf", b"%PDF-1.4 national id", "application/pdf")}, data={"doc_type": "national_id"}, headers=farmer).json()
     assert client.post(
-        "/loans", json={"lender_user_id": lender_id, "amount": 400000, "purpose": "Seeds and fertiliser", "confirm_pin": "0000"}, headers=farmer
+        "/loans", json={**no_doc, "confirm_pin": "0000", "document_ids": [doc["id"]]}, headers=farmer
     ).status_code == 403
     loan = client.post(
         "/loans",
-        json={"lender_user_id": lender_id, "amount": 400000, "purpose": "Seeds and fertiliser", "repayment_month": "2027-03", "confirm_pin": "1234"},
+        json={**no_doc, "repayment_month": "2027-03", "document_ids": [doc["id"]]},
         headers=farmer,
     ).json()
+    assert [d["doc_type"] for d in loan["documents"]] == ["national_id"]
     seen = client.get(f"/loans/{loan['id']}", headers=lender).json()
     assert seen["profile"]["risk_band"] == profile["risk_band"]
     assert client.patch(f"/loans/{loan['id']}/decision", json={"status": "APPROVED"}, headers=lender).status_code == 422

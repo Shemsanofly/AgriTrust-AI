@@ -26,6 +26,7 @@ const verify = () => import('./features/verify/VerifyPage')
 const admin = () => import('./features/admin/AdminPages')
 
 const ProfilePage = named(account, 'ProfilePage')
+const ReportsPage = named(() => import('./features/account/ReportsPage'), 'ReportsPage')
 const AlertsPage = named(alerts, 'AlertsPage')
 const FarmerHome = named(farmer, 'FarmerHome')
 const MyFarmPage = named(myFarm, 'MyFarmPage')
@@ -169,6 +170,7 @@ export default function App() {
             <Route path="verify/:id" element={<VerifyPage />} />
             <Route path="scan" element={<ScanPage />} />
             <Route path="profile" element={<ProfilePage />} />
+            <Route path="reports" element={<ReportsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         )}

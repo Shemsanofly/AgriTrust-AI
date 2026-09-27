@@ -475,10 +475,12 @@ export function Dialog({ open, onClose, title, children, footer, wide }: { open:
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     document.addEventListener('keydown', onKey)
     document.body.style.overflow = 'hidden'
+    document.body.classList.add('dialog-open')
     requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>('input, button[data-autofocus], select, textarea')?.focus())
     return () => {
       document.removeEventListener('keydown', onKey)
       document.body.style.overflow = ''
+      document.body.classList.remove('dialog-open')
       prev?.focus?.()
     }
   }, [open, onClose])

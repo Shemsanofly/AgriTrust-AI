@@ -92,3 +92,4 @@ def test_accepted_contracts_raise_market_certainty_and_loan_limit(client, login)
     assert after["offtake"]["score"] > before["offtake"]["score"]
     loan = lambda p: next(x for x in p["suggested_products"] if x["type"] == "input_loan")["max_amount_tzs"]  # noqa: E731
     assert loan(profile_after) > loan(profile_before)  # 40% instead of 30% of expected income
+

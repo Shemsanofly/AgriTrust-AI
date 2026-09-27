@@ -9,6 +9,11 @@ argon2-cffi>=23.1
 httpx>=0.27
 pycryptodome>=3.20
 qrcode>=7.4
+# AI credit model (loan eligibility)
+scikit-learn>=1.5
+numpy>=1.26
+# PDF reports
+reportlab>=4.2
 # Optional: real EVM anchoring (otherwise a local SIMULATED ledger is used)
 web3>=7.0
 # Optional: PostgreSQL

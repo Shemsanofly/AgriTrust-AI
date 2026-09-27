@@ -55,7 +55,8 @@
     "users": "Watumiaji",
     "sms": "Kumbukumbu za SMS",
     "demoTools": "Zana za maonyesho",
-    "contracts": "Mikataba"
+    "contracts": "Mikataba",
+    "reports": "Ripoti"
   },
   "roles": {
     "FARMER": "Mkulima",
@@ -584,7 +585,8 @@
     "noRequestsBody": "Maombi ya wanunuzi yanaonekana hapa, na kwa SMS.",
     "noHistory": "Bado hakuna oda zilizokamilika.",
     "nothingListed": "Hakuna unachouza",
-    "nothingListedBody": "Weka bei kwenye kundi lililohifadhiwa ili liingie sokoni."
+    "nothingListedBody": "Weka bei kwenye kundi lililohifadhiwa ili liingie sokoni.",
+    "availableHint": "Zinapatikana ghalani: {{kg}}"
   },
   "orders": {
     "number": "Oda #{{id}}",
@@ -682,7 +684,8 @@
       "improve": "Cha kuboresha",
       "fullRecord": "Ona rekodi yangu kamili",
       "sharing": "Wewe ndiye unaamua mkopeshaji au bima gani anaona rekodi zako.",
-      "manage": "Simamia kushiriki"
+      "manage": "Simamia kushiriki",
+      "loanNotYet": "Bado hustahili (AI: {{pct}}% uwezekano wa kulipa)"
     }
   },
   "profile": {
@@ -751,14 +754,7 @@
     "noProduct": "Ongeza zao linalokua lenye tarehe ya mavuno kupata pendekezo.",
     "upTo": "Hadi",
     "repayAfter": "Rejesha baada ya mavuno",
-    "eligibility": "Mkopeshaji ataona nini",
-    "elig": {
-      "sales_one": "mauzo {{count}} yaliyothibitishwa",
-      "sales_other": "mauzo {{count}} yaliyothibitishwa",
-      "receipts": "Mazao yamehifadhiwa na stakabadhi ya ghala",
-      "activity": "Historia ya shughuli za shamba (ushauri uliofuatwa)",
-      "cashflow": "Makadirio ya mapato ya msimu"
-    },
+    "eligibility": "Kinachokufanya ustahili",
     "eligibilityNote": "Hivi ni viashiria tu. Mkopeshaji ndiye anayeamua.",
     "applyTitle": "Omba",
     "lender": "Mkopeshaji",
@@ -1125,7 +1121,7 @@
     "acreage": "Andika ukubwa kwa ekari.",
     "ph": "pH kwa kawaida iko kati ya 4 na 9.",
     "quantity": "Andika kiasi kwa kg.",
-    "qtyMax": "Zinazopatikana ni hadi {{kg}}.",
+    "qtyMax": "Kuna {{kg}} tu ghalani. Weka {{kg}} au chini ya hapo.",
     "price": "Andika bei kwa kg.",
     "amount": "Andika kiasi.",
     "purpose": "Eleza ni kwa ajili ya nini.",
@@ -1179,7 +1175,23 @@
     "face_not_recognised": "Hatukuweza kutambua uso huu. Jaribu tena au tumia PIN yako.",
     "face_unavailable": "Face ID haiwezi kukaguliwa sasa. Tumia PIN yako.",
     "face_disabled": "Face ID haipatikani.",
-    "delivery_in_past": "Mwezi wa kupeleka umeshapita."
+    "delivery_in_past": "Mwezi wa kupeleka umeshapita.",
+    "payment_pending": "Ombi la malipo tayari linasubiri kukubaliwa.",
+    "payment_provider_error": "Malipo hayakuweza kuanzishwa. Hakikisha namba na ujaribu tena.",
+    "amount_too_small": "Malipo ya pesa ya simu lazima yawe angalau TZS 500.",
+    "photo_too_large": "Picha hiyo ni kubwa mno (kikomo MB 5).",
+    "not_an_image": "Faili hilo si picha. Tumia picha ya JPEG, PNG au WebP.",
+    "too_many_photos": "Zao hili tayari lina picha 12. Futa moja ili uongeze nyingine.",
+    "crop_area_exceeds_farm": "Zao moja linaweza kutumia shamba zima tu.",
+    "harvest_before_planting": "Tarehe ya mavuno lazima iwe baada ya tarehe ya kupanda.",
+    "email_required": "Barua pepe inahitajika kwa malipo haya.",
+    "payment_setup_incomplete": "Malipo ya moja kwa moja hayajawekwa kikamilifu (anwani ya umma ya tovuti haipo). Wasiliana na timu ya jukwaa.",
+    "document_required": "Pakia angalau nyaraka moja ya kuthibitisha pamoja na ombi lako.",
+    "invalid_document": "Nyaraka hiyo haiwezi kutumika (tayari imetumwa au si yako). Ipakie tena.",
+    "not_a_document": "Faili hilo si PDF wala picha.",
+    "document_too_large": "Nyaraka hiyo ni kubwa mno (kikomo MB 5).",
+    "too_many_documents": "Una nyaraka 10 zinazosubiri. Ondoa baadhi au tuma ombi lako.",
+    "document_in_use": "Nyaraka hii ni sehemu ya ombi na haiwezi kuondolewa tena."
   },
   "face": {
     "title": "Face ID",
@@ -1269,5 +1281,123 @@
       "cancel": "Ofa imeondolewa",
       "fulfil": "Mkataba umewekwa kuwa umepelekwa"
     }
+  },
+  "pay": {
+    "title": "Lipa kwa pesa ya simu",
+    "phone": "Namba ya pesa ya simu",
+    "phoneHint": "M-Pesa, Airtel Money, Mixx by Yas au Halotel. Utapokea ombi kwenye simu hii.",
+    "appPin": "PIN yako ya programu (malipo makubwa)",
+    "liveNote": "Haya ni malipo halisi kupitia Snippe. Pesa zitatoka kwenye akaunti yako ya pesa ya simu ukikubali ombi kwa PIN yako ya pesa ya simu.",
+    "send": "Tuma ombi la malipo ({{amount}})",
+    "checkPhone": "Angalia simu yako",
+    "approveOn": "Kubali malipo ya {{amount}} kwenye {{phone}} kwa PIN yako ya pesa ya simu.",
+    "waiting": "Inasubiri ukubali… ukurasa huu unajisasisha wenyewe.",
+    "slow": "Bado inasubiri. Kama hukupokea ombi, funga hapa ujaribu tena baadaye.",
+    "later": "Funga (oda itasasishwa ikishalipwa)",
+    "tryAgain": "Jaribu tena",
+    "paid": "Malipo ya {{amount}} yamepokelewa",
+    "checkPayment": "Kagua malipo",
+    "pendingLine": "Malipo yanasubiri kukubaliwa kwenye {{phone}}",
+    "viaSnippe": "Imelipwa kupitia Snippe",
+    "status": {
+      "FAILED": "Malipo yameshindikana",
+      "EXPIRED": "Muda wa malipo umeisha",
+      "VOIDED": "Malipo yameghairiwa",
+      "PENDING": "Inasubiri malipo",
+      "COMPLETED": "Imelipwa"
+    },
+    "email": "Barua pepe ya stakabadhi ya malipo",
+    "emailHint": "Snippe inahitaji barua pepe kwa kila malipo. Tunaihifadhi kwenye wasifu wako.",
+    "emailInvalid": "Weka barua pepe sahihi.",
+    "refused": "Snippe imekataa malipo: {{reason}}",
+    "reasons": {
+      "carrier": "namba hii si M-Pesa, Airtel Money, Mixx by Yas wala Halotel.",
+      "balance": "hakuna pesa za kutosha kwenye akaunti hii ya pesa ya simu."
+    },
+    "tooSmall": "Oda hii iko chini ya {{min}}, kiasi kidogo zaidi Snippe inachokubali kwa pesa ya simu. Omba mkulima kiasi kikubwa zaidi au bei mpya."
+  },
+  "crop": {
+    "add": "Ongeza zao",
+    "addTitle": "Ongeza zao kwenye {{farm}}",
+    "variety": "Aina",
+    "added": "{{crop}} limeongezwa",
+    "acreageHint": "Sehemu ya ekari zako {{acres}}. Mazao yanaweza kushiriki ardhi (kilimo mseto).",
+    "acreageMax": "Zao moja linaweza kutumia shamba zima tu ({{acres}} ekari)."
+  },
+  "photos": {
+    "add": "Picha",
+    "uploading": "Inatuma…",
+    "added": "Picha imehifadhiwa",
+    "deleted": "Picha imefutwa",
+    "delete": "Futa picha",
+    "open": "Fungua picha ya {{crop}} ya {{date}}"
+  },
+  "ai": {
+    "prediction": "Utabiri wa AI wa mkopo",
+    "likely": "{{pct}}% uwezekano wa kulipa",
+    "eligibleYes": "Unastahili mkopo wa pembejeo.",
+    "eligibleNo": "Bado hustahili. Vidokezo hapa chini vinaongeza nafasi yako.",
+    "threshold": "Unastahili kuanzia {{pct}}%",
+    "helped": "Kilichokusaidia",
+    "heldBack": "Kilichokurudisha nyuma",
+    "modelCard": "Imetabiriwa na mfano wa {{model}} kutokana na shughuli na miamala yako (umefunzwa kwa rekodi {{n}} za wakulima, marejesho halisi {{real}}; alama ya usahihi {{auc}}/100).",
+    "simulatedData": "Rekodi nyingi za mafunzo ni za kuigwa hadi mikopo halisi ya kutosha ilipwe kwenye jukwaa. Mkopeshaji ndiye anayefanya uamuzi wa mwisho."
+  },
+  "loanDocs": {
+    "title": "Nyaraka za kuthibitisha",
+    "hint": "Inahitajika: PDF au picha, mfano kitambulisho cha taifa (NIDA), barua ya umiliki au ukodishaji wa ardhi, au barua ya ushirika. Kikomo MB 5.",
+    "type": "Aina ya nyaraka",
+    "upload": "Pakia",
+    "open": "Fungua",
+    "download": "Pakua",
+    "remove": "Ondoa {{name}}",
+    "required": "Pakia angalau nyaraka moja ya kuthibitisha.",
+    "lenderSub": "Zimepakiwa na mkulima. Kila kutazama kunarekodiwa.",
+    "noneFromUssd": "Hakuna nyaraka iliyoambatishwa (ameomba kwa simu ya kawaida / USSD). Muombe mkulima nyaraka kabla ya kuamua.",
+    "types": {
+      "national_id": "Kitambulisho cha Taifa (NIDA)",
+      "land": "Barua ya umiliki au ukodishaji wa ardhi",
+      "cooperative": "Barua ya ushirika (AMCOS)",
+      "other": "Nyaraka nyingine"
+    }
+  },
+  "hazard": {
+    "title": "Utabiri wa AI wa majanga",
+    "subtitle": "Hatari ya ukame, moto na mafuriko kwa shamba lako, kutoka utabiri wa hali ya hewa na mito.",
+    "loading": "Inakagua utabiri wa karibuni…",
+    "refresh": "Onyesha upya",
+    "unavailable": "Utabiri haupatikani kwa sasa (hakuna muunganisho na huduma ya hali ya hewa). Jaribu tena baadaye.",
+    "headline": "Hatari ya {{hazard}} ni {{level}} kwa {{farm}}. Angalia hatua za kuchukua hapa chini.",
+    "names": {
+      "drought": "Ukame",
+      "fire": "Moto",
+      "flood": "Mafuriko"
+    },
+    "levels": {
+      "low": "Ndogo",
+      "moderate": "Wastani",
+      "high": "Kubwa",
+      "severe": "Kubwa sana"
+    },
+    "chance": "Uwezekano {{pct}}%",
+    "window": "{{start}} hadi {{end}}",
+    "peak": "mbaya zaidi karibu {{day}}",
+    "whatToDo": "Hatua za kuchukua",
+    "coverCta": "Pata kinga: {{product}}",
+    "method": "Jinsi inavyofanya kazi: utabiri unaunganisha uwiano wa maji (mvua dhidi ya mvuke) na mvua dhidi ya kawaida ya miaka 10 kwa ukame, kiashiria cha Joto-Ukavu-Upepo kwa moto, na utabiri wa mtiririko wa mito na mvua kubwa kwa mafuriko, kuwa uwezekano kwa kila moja.",
+    "sources": "Data: {{sources}}.",
+    "updated": "Imesasishwa {{time}}."
+  },
+  "reports": {
+    "generated": "imetengenezwa {{time}}",
+    "live": "Hai · inajisasisha yenyewe",
+    "justUpdated": "Imesasishwa sasa hivi",
+    "pdf": "Pakua PDF",
+    "changes": "Mabadiliko (siku {{days}} zilizopita)",
+    "new": "Mpya",
+    "newCount_one": "{{count}} mpya",
+    "newCount_other": "{{count}} mpya",
+    "noChanges": "Hakuna mabadiliko katika kipindi hiki.",
+    "note": "Ripoti hii hutengenezwa kutoka data hai kila inapofunguliwa na hujisasisha kila sekunde 20 ikiwa wazi. PDF ina ripoti hiyo hiyo."
   }
 }

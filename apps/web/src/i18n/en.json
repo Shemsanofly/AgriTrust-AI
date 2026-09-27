@@ -55,7 +55,8 @@
     "users": "Users",
     "sms": "SMS log",
     "demoTools": "Demo tools",
-    "contracts": "Contracts"
+    "contracts": "Contracts",
+    "reports": "Reports"
   },
   "roles": {
     "FARMER": "Farmer",
@@ -584,7 +585,8 @@
     "noRequestsBody": "Buyers' requests appear here, and by SMS.",
     "noHistory": "No completed orders yet.",
     "nothingListed": "Nothing for sale",
-    "nothingListedBody": "Set a price on a stored batch to put it in the marketplace."
+    "nothingListedBody": "Set a price on a stored batch to put it in the marketplace.",
+    "availableHint": "Available in the ghala: {{kg}}"
   },
   "orders": {
     "number": "Order #{{id}}",
@@ -682,7 +684,8 @@
       "improve": "What to improve",
       "fullRecord": "See my full record",
       "sharing": "You decide which lender or insurer can see your records.",
-      "manage": "Manage sharing"
+      "manage": "Manage sharing",
+      "loanNotYet": "Not eligible yet (AI: {{pct}}% likely to repay)"
     }
   },
   "profile": {
@@ -751,14 +754,7 @@
     "noProduct": "Add a growing crop with a harvest date to get a suggestion.",
     "upTo": "Up to",
     "repayAfter": "Repay after harvest",
-    "eligibility": "What the lender will see",
-    "elig": {
-      "sales_one": "{{count}} verified sale",
-      "sales_other": "{{count}} verified sales",
-      "receipts": "Produce stored with a ghala receipt",
-      "activity": "Farm activity history (advice followed)",
-      "cashflow": "Seasonal cash-flow estimate"
-    },
+    "eligibility": "What makes you eligible",
     "eligibilityNote": "These are indicators only. The lender decides.",
     "applyTitle": "Apply",
     "lender": "Lender",
@@ -1125,7 +1121,7 @@
     "acreage": "Enter the size in acres.",
     "ph": "pH is usually between 4 and 9.",
     "quantity": "Enter a quantity in kg.",
-    "qtyMax": "Up to {{kg}} is available.",
+    "qtyMax": "Only {{kg}} is in stock. Enter {{kg}} or less.",
     "price": "Enter a price per kg.",
     "amount": "Enter an amount.",
     "purpose": "Say what it's for.",
@@ -1179,7 +1175,23 @@
     "face_not_recognised": "We couldn't recognise this face. Try again or use your PIN.",
     "face_unavailable": "Face ID can't be checked right now. Use your PIN.",
     "face_disabled": "Face ID is not available.",
-    "delivery_in_past": "The delivery month is in the past."
+    "delivery_in_past": "The delivery month is in the past.",
+    "payment_pending": "A payment request is already waiting for approval.",
+    "payment_provider_error": "The payment could not be started. Check the number and try again.",
+    "amount_too_small": "Mobile money payments must be at least TZS 500.",
+    "photo_too_large": "That photo is too large (max 5 MB).",
+    "not_an_image": "That file is not a photo. Use a JPEG, PNG or WebP picture.",
+    "too_many_photos": "This crop already has 12 photos. Delete one to add another.",
+    "crop_area_exceeds_farm": "A crop can use at most the whole farm.",
+    "harvest_before_planting": "The harvest date must be after the planting date.",
+    "email_required": "An email address is needed for this payment.",
+    "payment_setup_incomplete": "Live payments are not fully set up (the public web address is missing). Contact the platform team.",
+    "document_required": "Upload at least one supporting document with your application.",
+    "invalid_document": "That document cannot be used (already sent or not yours). Upload it again.",
+    "not_a_document": "That file is not a PDF or a photo.",
+    "document_too_large": "That document is too large (max 5 MB).",
+    "too_many_documents": "You have 10 documents waiting. Remove some or send your application.",
+    "document_in_use": "This document is part of an application and can no longer be removed."
   },
   "face": {
     "title": "Face ID",
@@ -1269,5 +1281,123 @@
       "cancel": "Offer withdrawn",
       "fulfil": "Contract marked delivered"
     }
+  },
+  "pay": {
+    "title": "Pay with mobile money",
+    "phone": "Mobile money number",
+    "phoneHint": "M-Pesa, Airtel Money, Mixx by Yas or Halotel. You get a prompt on this phone.",
+    "appPin": "Your app PIN (large payment)",
+    "liveNote": "This is a real payment through Snippe. Money leaves your mobile money account when you approve the prompt with your mobile money PIN.",
+    "send": "Send payment request ({{amount}})",
+    "checkPhone": "Check your phone",
+    "approveOn": "Approve the {{amount}} payment on {{phone}} with your mobile money PIN.",
+    "waiting": "Waiting for your approval… this page updates by itself.",
+    "slow": "Still waiting. If you did not get a prompt, close this and try again later.",
+    "later": "Close (the order updates once paid)",
+    "tryAgain": "Try again",
+    "paid": "Payment of {{amount}} received",
+    "checkPayment": "Check payment",
+    "pendingLine": "Payment waiting for approval on {{phone}}",
+    "viaSnippe": "Paid via Snippe",
+    "status": {
+      "FAILED": "Payment failed",
+      "EXPIRED": "Payment expired",
+      "VOIDED": "Payment cancelled",
+      "PENDING": "Waiting for payment",
+      "COMPLETED": "Paid"
+    },
+    "email": "Email for the payment receipt",
+    "emailHint": "Snippe needs an email for every payment. We save it to your profile.",
+    "emailInvalid": "Enter a valid email address.",
+    "refused": "Snippe refused the payment: {{reason}}",
+    "reasons": {
+      "carrier": "this number is not M-Pesa, Airtel Money, Mixx by Yas or Halotel.",
+      "balance": "there is not enough money on this mobile money account."
+    },
+    "tooSmall": "This order is below {{min}}, the smallest amount Snippe accepts for mobile money. Ask the farmer for a larger quantity or a new price."
+  },
+  "crop": {
+    "add": "Add crop",
+    "addTitle": "Add a crop to {{farm}}",
+    "variety": "Variety",
+    "added": "{{crop}} added",
+    "acreageHint": "Part of your {{acres}} acres. Crops can share land (intercropping).",
+    "acreageMax": "A crop can use at most the whole farm ({{acres}} acres)."
+  },
+  "photos": {
+    "add": "Photo",
+    "uploading": "Sending…",
+    "added": "Photo saved",
+    "deleted": "Photo deleted",
+    "delete": "Delete photo",
+    "open": "Open {{crop}} photo from {{date}}"
+  },
+  "ai": {
+    "prediction": "AI loan prediction",
+    "likely": "{{pct}}% likely to repay",
+    "eligibleYes": "You qualify for an input loan.",
+    "eligibleNo": "Not eligible yet. The tips below raise your chances.",
+    "threshold": "Eligible from {{pct}}%",
+    "helped": "What helped you",
+    "heldBack": "What held you back",
+    "modelCard": "Predicted by a {{model}} model from your activities and transactions (trained on {{n}} farmer records, {{real}} real repayments; accuracy score {{auc}}/100).",
+    "simulatedData": "Most training records are simulated until enough real loans are repaid on the platform. The lender makes the final decision."
+  },
+  "loanDocs": {
+    "title": "Supporting documents",
+    "hint": "Required: a PDF or photo, e.g. your national ID (NIDA), a land or lease letter, or a cooperative letter. Max 5 MB.",
+    "type": "Document type",
+    "upload": "Upload",
+    "open": "Open",
+    "download": "Download",
+    "remove": "Remove {{name}}",
+    "required": "Upload at least one supporting document.",
+    "lenderSub": "Uploaded by the farmer. Every view is recorded.",
+    "noneFromUssd": "No document was attached (applied by basic phone / USSD). Ask the farmer for one before deciding.",
+    "types": {
+      "national_id": "National ID (NIDA)",
+      "land": "Land ownership or lease letter",
+      "cooperative": "Cooperative (AMCOS) letter",
+      "other": "Other document"
+    }
+  },
+  "hazard": {
+    "title": "AI disaster forecast",
+    "subtitle": "Drought, fire and flood risk for your farm, from live weather and river forecasts.",
+    "loading": "Checking the latest forecasts…",
+    "refresh": "Refresh",
+    "unavailable": "Forecasts are unavailable right now (no connection to the weather service). Try again later.",
+    "headline": "{{hazard}} risk is {{level}} for {{farm}}. See what to do below.",
+    "names": {
+      "drought": "Drought",
+      "fire": "Fire",
+      "flood": "Flood"
+    },
+    "levels": {
+      "low": "Low",
+      "moderate": "Moderate",
+      "high": "High",
+      "severe": "Very high"
+    },
+    "chance": "{{pct}}% chance",
+    "window": "{{start}} to {{end}}",
+    "peak": "worst around {{day}}",
+    "whatToDo": "What to do",
+    "coverCta": "Get cover: {{product}}",
+    "method": "How it works: the forecast combines water balance (rain vs. evaporation) and rain vs. the 10-year normal for drought, the Hot-Dry-Windy index for fire, and the river-flow forecast and heavy-rain bursts for flood, into a chance for each.",
+    "sources": "Data: {{sources}}.",
+    "updated": "Updated {{time}}."
+  },
+  "reports": {
+    "generated": "built {{time}}",
+    "live": "Live · updates automatically",
+    "justUpdated": "Updated just now",
+    "pdf": "Download PDF",
+    "changes": "What changed (last {{days}} days)",
+    "new": "New",
+    "newCount_one": "{{count}} new",
+    "newCount_other": "{{count}} new",
+    "noChanges": "No changes in this period.",
+    "note": "This report is built from live data every time it opens and refreshes itself every 20 seconds while open. The PDF contains the same report."
   }
 }

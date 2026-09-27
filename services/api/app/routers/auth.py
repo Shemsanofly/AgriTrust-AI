@@ -68,6 +68,7 @@ def user_json(session: Session, user: User) -> dict:
     data = {
         "id": user.id,
         "phone": user.phone,
+        "email": user.email,
         "full_name": user.full_name,
         "role": user.role.value,
         "language": user.language.value,

@@ -8,6 +8,7 @@ export type Role = 'FARMER' | 'BUYER' | 'WAREHOUSE_OPERATOR' | 'LENDER' | 'INSUR
 export type User = {
   id: number
   phone: string
+  email?: string | null
   full_name: string
   role: Role
   language: Lang

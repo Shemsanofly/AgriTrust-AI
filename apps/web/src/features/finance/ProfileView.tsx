@@ -32,6 +32,14 @@ export type Profile = {
     monthly?: { month: string; income_tzs: [number, number] }[]
   }
   criteria: Criterion[]
+  eligibility?: {
+    eligible: boolean
+    probability: number
+    threshold: number
+    helped: { key: string; label: Bi; impact: number }[]
+    held_back: { key: string; label: Bi; impact: number; tip: Bi }[]
+    model: { name: string; version: string; trained_on: number; real_outcomes: number; simulated: boolean; auc: number; accuracy: number }
+  } | null
   suggested_products: { type: string; reason: Bi; max_amount_tzs?: number; repayment_month?: string; status?: string }[]
   inputs: Record<string, any>
   disclaimer: Bi

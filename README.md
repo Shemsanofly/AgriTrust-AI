@@ -26,7 +26,7 @@ Every feature carries one of these labels, so judges, partners and developers ca
 
 **Quick links for each audience:**
 
-- **Judges:** [Problem](#2-problem-statement) · [Solution](#4-proposed-solution) · [Hackathon MVP](#23-hackathon-mvp) · [Demo scenario](#24-demo-scenario) · [Expected impact](#30-expected-impact)
+- **Judges:** [Problem](#2-problem-statement) · [Solution](#4-proposed-solution) · [Hackathon MVP](#23-hackathon-mvp) · [Demo scenario](#24-demo-scenario) · [Competitive landscape](#28-competitive-landscape) · [Expected impact](#31-expected-impact)
 - **Developers:** [Architecture](#18-architecture-diagram) · [Data model](#20-suggested-data-model) · [Tech stack](#21-tech-stack) · [APIs](#22-apis-and-integrations) · [Setup](#25-installation-and-development-structure)
 - **Banks, MFIs and insurers:** [AI layer](#8-ai-layer) · [Loans](#12-loans) · [Insurance](#13-insurance) · [Privacy & responsible AI](#17-privacy-and-responsible-ai)
 - **Buyers and warehouses:** [Marketplace](#11-buyer--ghala-marketplace) · [Blockchain layer](#9-blockchain-trust-layer) · [Warehouse receipts](#63-digital-warehouse-receipts)
@@ -63,11 +63,12 @@ Every feature carries one of these labels, so judges, partners and developers ca
 25. [Installation and development structure](#25-installation-and-development-structure)
 26. [Future roadmap](#26-future-roadmap)
 27. [Business and sustainability model](#27-business-and-sustainability-model)
-28. [African scalability](#28-african-scalability)
-29. [Risks and limitations](#29-risks-and-limitations)
-30. [Expected impact](#30-expected-impact)
-31. [Team and contributors](#31-team-and-contributors)
-32. [License](#32-license)
+28. [Competitive landscape](#28-competitive-landscape)
+29. [African scalability](#29-african-scalability)
+30. [Risks and limitations](#30-risks-and-limitations)
+31. [Expected impact](#31-expected-impact)
+32. [Team and contributors](#32-team-and-contributors)
+33. [License](#33-license)
 
 ---
 
@@ -1168,7 +1169,63 @@ Deploy the contracts (see `contracts/README.md`), then set `RPC_URL`, `CHAIN_ID`
 
 ---
 
-## 28. African scalability
+## 28. Competitive landscape
+
+Each existing player serves one or two steps of the farmer's journey. AgriTrust connects all of them (farm → ghala → market → finance) in **one verifiable record that the farmer owns**. Landscape as of mid-2026, from public sources (not exhaustive: about 24 agritech startups operate in Tanzania).
+
+### Who else is in the space
+
+| Player | What they do | Overlap with AgriTrust |
+|---|---|---|
+| **Warehouse Receipt System (WRRB) + Tanzania Mercantile Exchange (TMX)** | The official, regulated system: cooperatives (AMCOS) aggregate produce into licensed warehouses, receipts are issued, and crops are sold through online auctions. 2025/26: TZS 2.3 trillion paid to farmers, 1.12 billion kg traded (+43.6%). Banks (TADB, NBC) lend against the receipts | Ghala, receipts, marketplace, receipt-backed loans. The incumbent, with legal authority |
+| **MazaoHub** (Tanzania) | Low-cost soil sensors, AI agronomy advice and a farm-to-buyer crop trading platform (Agiza Mazao). Raised about $2.2M, the most of any B2B agritech in Tanzania | Soil IoT, AI advice, marketplace. The closest local startup |
+| **Kilimo Fresh** (Tanzania) | Buys, processes and delivers farmers' produce to buyers | Farmer-to-buyer trade, as an intermediary rather than a marketplace |
+| **One Acre Fund** (Tanzania) | Inputs and training in the Southern Highlands, with pilots in Dodoma; has scaled back input credit in Tanzania | Input finance, an opening for AgriTrust |
+| **Apollo Agriculture** (Kenya, Zambia) | Inputs on credit, underwritten by machine-learning credit scoring on field, satellite and bureau data; 350,000+ farmers; securitised farmer loans in 2026 | AI credit scoring for input loans |
+| **Pula** (Kenya-based, pan-African) | Smallholder crop insurance, often bundled into input prices; not a main market in Tanzania yet | Insurance and weather-index cover |
+
+### Side by side
+
+✅ has it · ◐ partly · ✗ not
+
+| Capability | **AgriTrust** | WRS / TMX | MazaoHub | Apollo | One Acre Fund | Pula |
+|---|---|---|---|---|---|---|
+| Farm data (soil sensors, AI advice) | ✅ | ✗ | ✅ | ◐ | ◐ | ✗ |
+| Ghala storage monitoring + receipts | ✅ | ✅ legal receipts | ✗ | ✗ | ✗ | ✗ |
+| Marketplace (farmer ↔ buyer) | ✅ | ✅ auctions | ✅ | ✗ | ✗ | ✗ |
+| Off-take contracts for a future harvest | ✅ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| AI loan prediction from farm activity | ✅ | ✗ | ✗ | ✅ | ◐ | ✗ |
+| Disaster forecast + insurance | ✅ | ✗ | ◐ | ◐ via Pula | ◐ | ✅ |
+| Records anyone can verify (QR, tamper-evident) | ✅ | ◐ | ✗ | ✗ | ✗ | ✗ |
+| Farmer controls who sees their data | ✅ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Basic phones (USSD / SMS) | ✅ | ◐ | ✅ | ✅ | ✅ | ✅ |
+
+### What differentiates AgriTrust
+
+1. **One connected record, not one feature.** A harvest stored in the ghala becomes a marketplace listing, a sale becomes credit history, a buyer contract raises the loan limit, and a disaster forecast points to the right insurance. Each step strengthens the next.
+2. **Trust anyone can verify.** Batches, receipts, storage records and sales are fingerprinted, and a public QR code shows whether anything was altered. Buyers and banks check the record themselves instead of trusting the platform.
+3. **The farmer owns the data.** Lenders and insurers see a farmer's record only with the farmer's consent; every view is logged, and consent can be withdrawn at any time.
+4. **Explainable AI.** The loan prediction tells farmers *why* (for example, "no verified sales yet") and *what to do* ("sell through the Market"); the disaster forecast shows the numbers behind each risk.
+5. **Built for the individual Tanzanian smallholder.** Kiswahili first, USSD for basic phones, mobile-money payments, GPS farm registration, and loans timed to the harvest. WRS / TMX, by contrast, is mostly reached through cooperatives.
+
+### Where competitors are ahead
+
+- **WRS / TMX** has legal authority and national volume; AgriTrust's digital receipts are platform records, not legal warehouse receipts.
+- **Apollo** trains on real repayment data from hundreds of thousands of farmers; AgriTrust's credit model is trained mostly on simulated data until real repayments accumulate (see [Risks and limitations](#30-risks-and-limitations)).
+- **MazaoHub** has field teams and funding.
+- AgriTrust is an MVP: the lender and insurer are simulated and there are no live users yet.
+
+### Positioning
+
+**Integrate with WRS / TMX rather than compete with it.** AgriTrust can bring cleaner, verified farmer records into the regulated system, which is the route to warehouse-receipt-backed loans (on the [roadmap](#26-future-roadmap)) and a partnership revenue stream ([section 27](#27-business-and-sustainability-model)).
+
+> *Others help farmers with one step. AgriTrust turns everything a farmer does, from farm to ghala to market, into a verified record the farmer owns, which unlocks fair prices, loans and insurance.*
+
+**Sources:** [The Citizen: WRS generates Sh2.3 trillion](https://www.thecitizen.co.tz/tanzania/news/national/warehouse-receipts-system-generates-sh2-3-trillion-for-tanzania-farmers-traders-5542840) · [TradeMark Africa: TMX digital commodity trading](https://trademarkafrica.com/projects/tanzania-mercantile-exchange-digital-commodity-trading/) · [Tracxn: AgriTech startups in Tanzania](https://tracxn.com/d/explore/agritech-startups-in-tanzania/___GciUxoggEciH_eI2JLcbBBz4D92ZTajY26dUvgSdYg#top-companies) · [AgriTech MEA: MazaoHub raises $2M](https://www.agritechmea.com/tanzanias-mazaohub-raises-us2m-to-expand-climate-smart-agronomy/) · [One Acre Fund: Tanzania](https://oneacrefund.org/what-we-do/countries-we-serve/tanzania) · [GSMA: AI-driven lending at Apollo Agriculture](https://www.gsma.com/solutions-and-impact/connectivity-for-good/mobile-for-development/programme/agritech/ai-driven-smallholder-farmer-lending-in-africa-insights-from-apollo-agriculture/) · [Kenyan Wall Street: Apollo securitisation](https://kenyanwallstreet.com/apollo-agriculture-securitization-tranche) · [Bayer Foundation: Pula partnership](https://www.bayer-foundation.com/partnership-pula-foundation-insuring-10-million-smallholder-farmers-across-africa-asia)
+
+---
+
+## 29. African scalability
 
 | Dimension | How we scale |
 |---|---|
@@ -1182,7 +1239,7 @@ Deploy the contracts (see `contracts/README.md`), then set `RPC_URL`, `CHAIN_ID`
 
 ---
 
-## 29. Risks and limitations
+## 30. Risks and limitations
 
 | Risk / limitation | Impact | Mitigation |
 |---|---|---|
@@ -1199,7 +1256,7 @@ Deploy the contracts (see `contracts/README.md`), then set `RPC_URL`, `CHAIN_ID`
 
 ---
 
-## 30. Expected impact
+## 31. Expected impact
 
 We don't claim impact numbers before a pilot. Instead, we define **what we will measure**:
 
@@ -1216,7 +1273,7 @@ We don't claim impact numbers before a pilot. Instead, we define **what we will 
 
 ---
 
-## 31. Team and contributors
+## 32. Team and contributors
 
 | Name | Role | GitHub |
 |---|---|---|
@@ -1232,7 +1289,7 @@ Built for the **Tanzania GirlCode Hackathon 2026**, Challenge #9: AI Agricultura
 
 ---
 
-## 32. License
+## 33. License
 
 Proposed: **MIT License**. *(Team to confirm; add a `LICENSE` file.)*
 

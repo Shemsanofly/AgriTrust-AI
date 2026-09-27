@@ -156,6 +156,20 @@ class Crop(SQLModel, table=True):
     growth_stage: str = "vegetative"  # initial | vegetative | flowering | maturity | harvested
 
 
+class CropPhoto(SQLModel, table=True):
+    """A photo the farmer took of a crop. The file lives in UPLOAD_DIR (never in the DB or
+    on chain) and is only served to the farm's owner and admins."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    crop_id: int = Field(foreign_key="crop.id", index=True)
+    farm_id: int = Field(foreign_key="farm.id", index=True)
+    stored_name: str  # random file name inside UPLOAD_DIR/crops
+    content_type: str
+    size_bytes: int
+    caption: str = ""
+    created_at: datetime = Field(default_factory=utcnow)
+
+
 class Sensor(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     device_id: str = Field(index=True, unique=True)
@@ -294,6 +308,24 @@ class OffTakeContract(SQLModel, table=True):
     decided_at: Optional[datetime] = None
 
 
+class PaymentIntent(SQLModel, table=True):
+    """One attempt to pay an order. With Snippe the buyer approves a USSD prompt; the order
+    becomes PAID only when Snippe confirms (webhook or status check)."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    order_id: int = Field(foreign_key="order.id", index=True)
+    provider: str  # simulated | snippe
+    reference: Optional[str] = Field(default=None, index=True)  # the provider's payment reference
+    amount: int
+    currency: str = "TZS"
+    phone: str
+    # PENDING | COMPLETED | FAILED | EXPIRED | VOIDED
+    status: str = "PENDING"
+    failure_reason: Optional[str] = None
+    created_at: datetime = Field(default_factory=utcnow)
+    completed_at: Optional[datetime] = None
+
+
 class OrderMessage(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     order_id: int = Field(foreign_key="order.id", index=True)
@@ -375,6 +407,22 @@ class ConsentRecord(SQLModel, table=True):
     granted_at: datetime = Field(default_factory=utcnow)
     expires_at: datetime
     revoked_at: Optional[datetime] = None
+
+
+class LoanDocument(SQLModel, table=True):
+    """A document the farmer uploads to support a loan application (national ID, land or lease
+    letter, cooperative letter...). Uploaded first, then attached when the application is sent.
+    Only the farmer, the lender of that application (with consent) and admins can open it."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    farmer_id: int = Field(foreign_key="farmer.id", index=True)
+    loan_id: Optional[int] = Field(default=None, foreign_key="loanapplication.id", index=True)
+    doc_type: str  # national_id | land | cooperative | other
+    original_name: str = ""
+    stored_name: str
+    content_type: str
+    size_bytes: int
+    created_at: datetime = Field(default_factory=utcnow)
 
 
 class LoanApplication(SQLModel, table=True):

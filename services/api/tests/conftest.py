@@ -7,9 +7,18 @@ _db = os.path.join(tempfile.mkdtemp(dir=_tmp_root), "test.db")
 os.environ["DATABASE_URL"] = f"sqlite:///{_db}"
 os.environ["WEATHER_MODE"] = "simulated"
 os.environ["GEOCODE_MODE"] = "offline"
+os.environ["UPLOAD_DIR"] = tempfile.mkdtemp()  # tests never write into the real uploads folder
 os.environ["DEV_MODE"] = "true"
 os.environ["RPC_URL"] = ""
 os.environ["AFRICASTALKING_API_KEY"] = ""
+# Tests must not depend on a developer's .env (real keys, codes, providers).
+os.environ["AFRICASTALKING_USSD_CODE"] = ""
+os.environ["PAYMENTS_PROVIDER"] = "simulated"
+os.environ["SNIPPE_API_KEY"] = ""
+os.environ["SNIPPE_WEBHOOK_SECRET"] = ""
+os.environ["FACEIO_PUBLIC_ID"] = ""
+os.environ["FACEIO_API_KEY"] = ""
+os.environ["PUBLIC_WEB_URL"] = "http://localhost:5173"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

@@ -75,14 +75,16 @@ async function refreshTokens(): Promise<boolean> {
   return refreshing
 }
 
-export async function api<T = any>(path: string, options: { method?: string; body?: unknown; auth?: boolean } = {}): Promise<T> {
-  const { method = 'GET', body, auth = true } = options
+/** Sends a request with the session token, refreshing it once on 401. A FormData body is
+ * sent as multipart (file uploads); anything else as JSON. */
+async function send(path: string, method: string, body: unknown, auth: boolean): Promise<Response> {
   const doFetch = () => {
     const headers: Record<string, string> = { 'Accept-Language': currentLang(), 'X-Device-Id': deviceId() }
-    if (body !== undefined) headers['Content-Type'] = 'application/json'
+    const form = body instanceof FormData
+    if (body !== undefined && !form) headers['Content-Type'] = 'application/json'
     const tokens = getTokens()
     if (auth && tokens) headers.Authorization = `Bearer ${tokens.access_token}`
-    return fetch(`${BASE}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) })
+    return fetch(`${BASE}${path}`, { method, headers, body: body === undefined ? undefined : form ? body : JSON.stringify(body) })
   }
   let res: Response
   try {
@@ -93,14 +95,29 @@ export async function api<T = any>(path: string, options: { method?: string; bod
   if (res.status === 401 && auth && getTokens() && (await refreshTokens())) {
     res = await doFetch()
   }
-  if (res.status === 204) return undefined as T
+  return res
+}
+
+async function fail(res: Response): Promise<never> {
   const data = await res.json().catch(() => null)
-  if (!res.ok) {
-    const detail = data?.detail
-    const code = typeof detail === 'string' ? detail : res.status === 422 ? 'validation' : 'unknown'
-    throw new ApiError(res.status, code, data && typeof data === 'object' ? data : {})
-  }
-  return data as T
+  const detail = data?.detail
+  const code = typeof detail === 'string' ? detail : res.status === 422 ? 'validation' : 'unknown'
+  throw new ApiError(res.status, code, data && typeof data === 'object' ? data : {})
+}
+
+export async function api<T = any>(path: string, options: { method?: string; body?: unknown; auth?: boolean } = {}): Promise<T> {
+  const { method = 'GET', body, auth = true } = options
+  const res = await send(path, method, body, auth)
+  if (res.status === 204) return undefined as T
+  if (!res.ok) return fail(res)
+  return (await res.json().catch(() => null)) as T
+}
+
+/** A private file (e.g. a crop photo) as a Blob; <img src> can't send the session token. */
+export async function apiBlob(path: string): Promise<Blob> {
+  const res = await send(path, 'GET', undefined, true)
+  if (!res.ok) return fail(res)
+  return res.blob()
 }
 
 export const apiUrl = (path: string) => `${BASE}${path}`

@@ -24,6 +24,7 @@ import {
 import { api } from '../../lib/api'
 import { useApi, useErrorText, useFormat } from '../../lib/hooks'
 import { ProfileView, type Profile } from './ProfileView'
+import { DocumentList, type LoanDoc } from './LoanDocuments'
 
 type Loan = {
   id: number
@@ -39,6 +40,7 @@ type Loan = {
   terms: { interest_rate_pct?: number; tenor_months?: number }
   consent: { state: string; expires_at: string } | null
   profile?: Profile | null
+  documents: LoanDoc[]
 }
 type Consent = { id: number; state: string; data_categories: string[]; purpose: string; expires_at: string; granted_at: string; farmer: { public_id: string; display_name: string } }
 
@@ -188,6 +190,9 @@ export function ApplicationDetail() {
           {data.profile && <Notice tone="info">{t('lender.accessLogged')}</Notice>}
         </div>
         <div className="space-y-5">
+          <Card title={t('loanDocs.title')} subtitle={t('loanDocs.lenderSub')}>
+            {data.documents.length ? <DocumentList docs={data.documents} /> : <Notice tone="warning">{t('loanDocs.noneFromUssd')}</Notice>}
+          </Card>
           <Card title={t('lender.decision')} subtitle={t('lender.decisionSub')}>
             {data.decision_reason && (
               <div className="mb-4 rounded-md bg-sunken p-3 text-[13px]">

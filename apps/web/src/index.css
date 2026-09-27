@@ -71,6 +71,12 @@ body {
   }
 }
 
+/* The Sarufi chat bubble floats over the bottom corner and would block dialog buttons
+   (Save, Pay) on phones; hide it while a dialog is open. */
+body.dialog-open #sarufi-widget {
+  display: none !important;
+}
+
 @layer components {
   .input {
     @apply block min-h-11 w-full rounded-md border border-line-strong bg-surface px-3 py-2 text-[15px] text-ink placeholder:text-muted/70 outline-none transition focus:border-forest-700 focus:ring-2 focus:ring-forest-100 disabled:bg-sunken aria-[invalid=true]:border-danger-700;

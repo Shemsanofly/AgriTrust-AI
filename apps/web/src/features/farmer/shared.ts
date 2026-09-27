@@ -5,9 +5,11 @@ export type Crop = {
   farm_id: number
   crop_type: string
   variety?: string
+  acreage?: number | null
   growth_stage: string
   planting_date: string
   expected_harvest_date?: string
+  photos?: { id: number; url: string; caption: string; created_at: string }[]
 }
 
 export type Farm = {

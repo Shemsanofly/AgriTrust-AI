@@ -102,7 +102,9 @@ export function FinancialStatus({ profile, onOpen }: { profile: Profile; onOpen:
                   ? t('finance.status.loanOffer', {
                       amount: f.tzs(loanOffer.max_amount_tzs),
                     })
-                  : undefined
+                  : profile.eligibility && !profile.eligibility.eligible
+                    ? t('finance.status.loanNotYet', { pct: Math.round(profile.eligibility.probability * 100) })
+                    : undefined
           }
           action={t('finance.status.openLoans')}
           onClick={() => onOpen('loans')}

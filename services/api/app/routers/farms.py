@@ -1,5 +1,5 @@
 from datetime import date, datetime, timedelta, timezone
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -10,7 +10,7 @@ from ..ai.soil_map import salinity_band
 from ..db import get_session
 from ..integrations.geocode import reverse_geocode
 from ..integrations.open_meteo import get_forecast, get_soil_moisture
-from ..models import Crop, Farm, Farmer, IrrigationAdvice, Role, Sensor, SensorReading, User, utcnow
+from ..models import Crop, CropPhoto, Farm, Farmer, IrrigationAdvice, Role, Sensor, SensorReading, User, utcnow
 from ..security.audit import audit
 from ..security.auth import farmer_for, get_current_user, require_roles
 
@@ -19,12 +19,12 @@ EAT = timezone(timedelta(hours=3))  # Africa/Dar_es_Salaam
 
 
 class CropIn(BaseModel):
-    crop_type: str = "maize"
-    variety: Optional[str] = None
+    crop_type: Literal["maize", "beans", "rice", "sorghum", "sunflower"] = "maize"
+    variety: Optional[str] = Field(default=None, max_length=60)
     acreage: Optional[float] = Field(default=None, gt=0, le=10_000)
     planting_date: date
     expected_harvest_date: Optional[date] = None
-    growth_stage: str = "vegetative"
+    growth_stage: Literal["initial", "vegetative", "flowering", "maturity"] = "vegetative"
 
 
 class FarmIn(BaseModel):
@@ -100,6 +100,11 @@ def _latest(session: Session, sensor_ids: list[int], metric: str) -> Optional[Se
     ).first()
 
 
+def _photos(session: Session, crop_id: int) -> list[dict]:
+    rows = session.exec(select(CropPhoto).where(CropPhoto.crop_id == crop_id).order_by(CropPhoto.created_at.desc()))  # type: ignore[attr-defined]
+    return [{"id": p.id, "url": f"/crop-photos/{p.id}", "caption": p.caption, "created_at": p.created_at.isoformat()} for p in rows]
+
+
 def farm_json(session: Session, farm: Farm) -> dict:
     crops = list(session.exec(select(Crop).where(Crop.farm_id == farm.id)))
     sensors = list(session.exec(select(Sensor).where(Sensor.farm_id == farm.id)))
@@ -111,7 +116,7 @@ def farm_json(session: Session, farm: Farm) -> dict:
             latest[metric] = {"value": r.value, "ts": r.ts.isoformat(), "quality_flag": r.quality_flag}
     return {
         **farm.model_dump(),
-        "crops": [c.model_dump() for c in crops],
+        "crops": [{**c.model_dump(), "photos": _photos(session, c.id)} for c in crops],
         "sensors": [
             {
                 "device_id": s.device_id,
@@ -201,6 +206,12 @@ def get_farm(farm_id: int, user: User = Depends(get_current_user), session: Sess
 @router.post("/farms/{farm_id}/crops", status_code=201)
 def add_crop(farm_id: int, body: CropIn, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     farm = load_farm(session, farm_id, user)
+    if body.expected_harvest_date and body.expected_harvest_date <= body.planting_date:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "harvest_before_planting")
+    # Several crops can share a farm, and intercropping (e.g. beans between maize) puts two on
+    # the same land, so only a single crop larger than the whole farm is refused.
+    if body.acreage and body.acreage > farm.acreage + 1e-9:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "crop_area_exceeds_farm")
     crop = Crop(farm_id=farm.id, **body.model_dump())
     session.add(crop)
     session.commit()
