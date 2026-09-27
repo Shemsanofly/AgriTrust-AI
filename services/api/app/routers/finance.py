@@ -270,28 +270,36 @@ def loan_json(session: Session, loan: LoanApplication, viewer: User) -> dict:
     }
 
 
-@router.post("/loans", status_code=201)
-def apply_loan(body: LoanIn, user: User = Depends(require_roles(Role.FARMER)), session: Session = Depends(get_session)):
-    require_pin(user, body.confirm_pin)
-    farmer = farmer_for(session, user)
-    lender = session.get(User, body.lender_user_id)
+def submit_loan(
+    session: Session, user: User, farmer: Farmer, lender_user_id: int, amount: float, purpose: str, repayment_month: Optional[str]
+) -> LoanApplication:
+    """Shared by the web app and USSD: consent to the lender, the application, and the lender's notification."""
+    lender = session.get(User, lender_user_id)
     if not lender or lender.role != Role.LENDER:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "invalid_grantee")
     consent = grant_consent(
-        session, user, farmer, lender.id, ["profile", "production", "storage", "sales", "receipts"], f"Loan application: {body.purpose}", 90
+        session, user, farmer, lender.id, ["profile", "production", "storage", "sales", "receipts"], f"Loan application: {purpose}", 90
     )
     loan = LoanApplication(
         farmer_id=farmer.id,
         lender_user_id=lender.id,
-        amount=body.amount,
-        purpose=body.purpose,
-        repayment_month=body.repayment_month,
+        amount=amount,
+        purpose=purpose,
+        repayment_month=repayment_month,
         consent_id=consent.id,
     )
     session.add(loan)
     session.flush()
     notify(session, lender, "LOAN", bi("alert.loan_submitted", loan=loan.id, amount=loan.amount), entity_type="LOAN", entity_id=str(loan.id))
     audit(session, user.id, "CREATE", "LOAN", loan.id, subject_farmer_id=farmer.id)
+    return loan
+
+
+@router.post("/loans", status_code=201)
+def apply_loan(body: LoanIn, user: User = Depends(require_roles(Role.FARMER)), session: Session = Depends(get_session)):
+    require_pin(user, body.confirm_pin)
+    farmer = farmer_for(session, user)
+    loan = submit_loan(session, user, farmer, body.lender_user_id, body.amount, body.purpose, body.repayment_month)
     session.commit()
     return loan_json(session, loan, user)
 
@@ -367,7 +375,10 @@ def decide_loan(loan_id: int, body: LoanDecisionIn, user: User = Depends(require
 
 @router.get("/insurance/recommendations")
 def insurance_recommendations(user: User = Depends(require_roles(Role.FARMER)), session: Session = Depends(get_session)):
-    farmer = farmer_for(session, user)
+    return {"simulated_insurer": True, "recommendations": insurance_recs(session, farmer_for(session, user))}
+
+
+def insurance_recs(session: Session, farmer: Farmer) -> list[dict]:
     recs = []
     farms = list(session.exec(select(Farm).where(Farm.farmer_id == farmer.id)))
     for farm in farms:
@@ -402,7 +413,7 @@ def insurance_recommendations(user: User = Depends(require_roles(Role.FARMER)), 
                 "priority": "MEDIUM",
             }
         )
-    return {"simulated_insurer": True, "recommendations": recs}
+    return recs
 
 
 def policy_json(session: Session, p: InsurancePolicy) -> dict:
@@ -430,31 +441,39 @@ def load_policy(session: Session, policy_id: int, user: User) -> InsurancePolicy
     raise HTTPException(status.HTTP_403_FORBIDDEN, "forbidden")
 
 
-@router.post("/insurance/policies", status_code=201)
-def request_policy(body: PolicyIn, user: User = Depends(require_roles(Role.FARMER)), session: Session = Depends(get_session)):
-    require_pin(user, body.confirm_pin)
-    farmer = farmer_for(session, user)
-    insurer = session.get(User, body.insurer_user_id)
+def submit_policy(
+    session: Session, user: User, farmer: Farmer, insurer_user_id: int, product: str, coverage_tzs: float, farm_id: Optional[int]
+) -> InsurancePolicy:
+    insurer = session.get(User, insurer_user_id)
     if not insurer or insurer.role != Role.INSURER:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "invalid_grantee")
-    farm = session.get(Farm, body.farm_id) if body.farm_id else None
-    if body.product == "weather_index":
+    farm = session.get(Farm, farm_id) if farm_id else None
+    if product == "weather_index":
         if not farm or farm.farmer_id != farmer.id:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "farm_required")
-    grant_consent(session, user, farmer, insurer.id, ["profile", "production", "storage"], f"Insurance: {body.product}", 180)
+    grant_consent(session, user, farmer, insurer.id, ["profile", "production", "storage"], f"Insurance: {product}", 180)
     today = date.today()
     policy = InsurancePolicy(
         farmer_id=farmer.id,
         insurer_user_id=insurer.id,
-        product=body.product,
-        coverage_tzs=body.coverage_tzs,
-        premium_tzs=round(body.coverage_tzs * (0.06 if body.product == "weather_index" else 0.02), -2),
+        product=product,
+        coverage_tzs=coverage_tzs,
+        premium_tzs=round(coverage_tzs * (0.06 if product == "weather_index" else 0.02), -2),
         farm_id=farm.id if farm else None,
-        rainfall_threshold_mm=(200.0 if farmer.region.lower() in DROUGHT_PRONE_REGIONS else 300.0) if body.product == "weather_index" else None,
-        window_start=today - timedelta(days=60) if body.product == "weather_index" else None,
-        window_end=today + timedelta(days=60) if body.product == "weather_index" else None,
+        rainfall_threshold_mm=(200.0 if farmer.region.lower() in DROUGHT_PRONE_REGIONS else 300.0) if product == "weather_index" else None,
+        window_start=today - timedelta(days=60) if product == "weather_index" else None,
+        window_end=today + timedelta(days=60) if product == "weather_index" else None,
     )
     session.add(policy)
+    session.flush()
+    return policy
+
+
+@router.post("/insurance/policies", status_code=201)
+def request_policy(body: PolicyIn, user: User = Depends(require_roles(Role.FARMER)), session: Session = Depends(get_session)):
+    require_pin(user, body.confirm_pin)
+    farmer = farmer_for(session, user)
+    policy = submit_policy(session, user, farmer, body.insurer_user_id, body.product, body.coverage_tzs, body.farm_id)
     session.commit()
     return policy_json(session, policy)
 
@@ -530,19 +549,25 @@ def check_parametric_trigger(policy_id: int, user: User = Depends(get_current_us
     return result
 
 
-@router.post("/insurance/claims", status_code=201)
-def file_claim(body: ClaimIn, user: User = Depends(require_roles(Role.FARMER)), session: Session = Depends(get_session)):
-    p = load_policy(session, body.policy_id, user)
-    if p.status != "ACTIVE":
+def submit_claim(
+    session: Session, user: User, policy: InsurancePolicy, trigger_type: str, description: str, extra_evidence: Optional[dict] = None
+) -> InsuranceClaim:
+    if policy.status != "ACTIVE":
         raise HTTPException(status.HTTP_409_CONFLICT, "policy_not_active")
-    evidence: dict = {"description": body.description}
-    if body.trigger_type == "STORAGE_LOSS":
+    evidence: dict = {"description": description, **(extra_evidence or {})}
+    if trigger_type == "STORAGE_LOSS":
         farmer = farmer_for(session, user)
         evidence["batches"] = [b.id for b in session.exec(select(CropBatch).where(CropBatch.farmer_id == farmer.id, CropBatch.status == "IN_STORAGE"))]
-    claim = InsuranceClaim(policy_id=p.id, trigger_type=body.trigger_type, status="FILED", evidence=evidence)
+    claim = InsuranceClaim(policy_id=policy.id, trigger_type=trigger_type, status="FILED", evidence=evidence)
     session.add(claim)
     session.flush()
-    notify(session, session.get(User, p.insurer_user_id), "CLAIM", bi("alert.claim_filed", claim=claim.id, policy=p.id), entity_type="CLAIM", entity_id=str(claim.id))
+    notify(session, session.get(User, policy.insurer_user_id), "CLAIM", bi("alert.claim_filed", claim=claim.id, policy=policy.id), entity_type="CLAIM", entity_id=str(claim.id))
+    return claim
+
+
+@router.post("/insurance/claims", status_code=201)
+def file_claim(body: ClaimIn, user: User = Depends(require_roles(Role.FARMER)), session: Session = Depends(get_session)):
+    claim = submit_claim(session, user, load_policy(session, body.policy_id, user), body.trigger_type, body.description)
     session.commit()
     return claim.model_dump(mode="json")
 
@@ -590,7 +615,12 @@ SPLIT = {"inputs": 0.40, "emergency": 0.20, "household": 0.30, "goal": 0.10}
 @router.get("/savings/plan")
 def savings_plan(user: User = Depends(require_roles(Role.FARMER)), session: Session = Depends(get_session)):
     """Rule-based split of the latest verified income. The farmer can always change it."""
-    farmer = farmer_for(session, user)
+    plan = savings_split(session, farmer_for(session, user))
+    session.rollback()  # planning only; do not store a new profile snapshot
+    return plan
+
+
+def savings_split(session: Session, farmer: Farmer) -> dict:
     last_sale = session.exec(
         select(Sale).where(Sale.farmer_id == farmer.id, Sale.completed_at.is_not(None)).order_by(Sale.completed_at.desc())  # type: ignore[union-attr]
     ).first()
@@ -600,7 +630,6 @@ def savings_plan(user: User = Depends(require_roles(Role.FARMER)), session: Sess
         flow = build_profile(session, farmer).cash_flow
         rng = flow.get("expected_income_range_tzs")
         amount, source = (rng[0], "cash_flow_estimate_low") if rng else (0.0, "none")
-        session.rollback()  # planning only; do not store a new profile snapshot
     return {
         "income_tzs": amount,
         "source": source,

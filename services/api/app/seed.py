@@ -115,11 +115,11 @@ def seed() -> None:
         s.add(farm)
         s.flush()
         growing = Crop(
-            farm_id=farm.id, crop_type="maize", variety="SC 403", planting_date=today - timedelta(days=40),
+            farm_id=farm.id, crop_type="maize", variety="SC 403", acreage=3, planting_date=today - timedelta(days=40),
             expected_harvest_date=today + timedelta(days=160), growth_stage="vegetative",
         )
         ready = Crop(
-            farm_id=farm.id, crop_type="maize", variety="Staha", planting_date=today - timedelta(days=115),
+            farm_id=farm.id, crop_type="maize", variety="Staha", acreage=2, planting_date=today - timedelta(days=115),
             expected_harvest_date=today, growth_stage="maturity",
         )
         s.add_all([growing, ready])

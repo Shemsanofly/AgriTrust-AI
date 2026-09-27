@@ -5,10 +5,11 @@ from datetime import datetime, timedelta
 
 from sqlmodel import Session, select
 
-from .ai import spoilage
+from .ai import ghala, spoilage
 from .chain.hashing import canonical_json, merkle_root, new_salt
 from .chain.records import anchor_entity
 from .i18n import bi
+from .integrations.open_meteo import get_current_conditions
 from .models import Alert, CropBatch, Farmer, Sensor, SensorReading, StorageRecord, User, Warehouse, WarehouseReceipt, utcnow
 from .notify import notify
 
@@ -40,6 +41,17 @@ def batch_risk(session: Session, batch: CropBatch, now: datetime | None = None) 
     days = (now.date() - receipt.date_in).days if receipt else 0
     series = ghala_series(session, batch.warehouse_id, now - timedelta(hours=24))
     return spoilage.assess(series, batch.crop_type, days)
+
+
+def batch_outlook(session: Session, batch: CropBatch, now: datetime | None = None) -> ghala.GhalaOutlook:
+    """Room forecast + quick actions for the ghala holding this batch."""
+    if not batch.warehouse_id:
+        return ghala.outlook([], None, batch.crop_type)
+    now = now or utcnow()
+    series = ghala_series(session, batch.warehouse_id, now - timedelta(hours=24))
+    wh = session.get(Warehouse, batch.warehouse_id)
+    outside = get_current_conditions(wh.lat, wh.lon) if wh and wh.lat is not None and wh.lon is not None else None
+    return ghala.outlook(series, outside, batch.crop_type)
 
 
 def evaluate_warehouse(session: Session, warehouse: Warehouse) -> None:

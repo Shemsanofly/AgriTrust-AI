@@ -1,7 +1,9 @@
 import os
 import tempfile
 
-_db = os.path.join(tempfile.mkdtemp(), "test.db")
+# Each test re-seeds; on a disk-backed temp dir SQLite's per-DDL fsync makes that ~10 s instead of ~0.5 s.
+_tmp_root = "/dev/shm" if os.path.isdir("/dev/shm") and os.access("/dev/shm", os.W_OK) else None
+_db = os.path.join(tempfile.mkdtemp(dir=_tmp_root), "test.db")
 os.environ["DATABASE_URL"] = f"sqlite:///{_db}"
 os.environ["WEATHER_MODE"] = "simulated"
 os.environ["GEOCODE_MODE"] = "offline"

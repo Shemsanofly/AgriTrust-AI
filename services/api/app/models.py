@@ -136,7 +136,12 @@ class Farm(SQLModel, table=True):
     soil_phosphorus: Optional[str] = None
     soil_potassium: Optional[str] = None
     organic_matter_pct: Optional[float] = None
+    soil_salinity_ec: Optional[float] = None  # dS/m
     soil_source: Optional[str] = None  # lab | soil_map | farmer
+    # Last moisture snapshot for farms without a soil sensor (volumetric %).
+    soil_moisture_pct: Optional[float] = None
+    soil_moisture_source: Optional[str] = None  # sensor | open-meteo | simulated
+    soil_checked_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=utcnow)
 
 
@@ -145,6 +150,7 @@ class Crop(SQLModel, table=True):
     farm_id: int = Field(foreign_key="farm.id", index=True)
     crop_type: str = "maize"
     variety: Optional[str] = None
+    acreage: Optional[float] = None
     planting_date: date
     expected_harvest_date: Optional[date] = None
     growth_stage: str = "vegetative"  # initial | vegetative | flowering | maturity | harvested
@@ -457,5 +463,26 @@ class SmsLog(SQLModel, table=True):
     phone: str
     language: str
     body: str
-    status: str  # SENT | LOGGED | FAILED
+    status: str  # PENDING | SENT | LOGGED | FAILED | DELIVERED
+    provider: Optional[str] = None
+    provider_message_id: Optional[str] = None
+    event_type: Optional[str] = None  # SOIL_MOISTURE_ALERT | SPOILAGE_RISK_ALERT | ...
+    user_id: Optional[int] = Field(default=None, foreign_key="user.id", index=True)
     created_at: datetime = Field(default_factory=utcnow)
+    sent_at: Optional[datetime] = None
+
+
+class UssdSession(SQLModel, table=True):
+    """Short-lived USSD conversation state. Temporary registration drafts live in payload only."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    session_id: str = Field(index=True, unique=True)
+    phone_number: str = Field(index=True)
+    current_menu: str = "MAIN_MENU"
+    state: str = "MAIN_MENU"
+    payload: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    provider: str = "africastalking"
+    user_id: Optional[int] = Field(default=None, foreign_key="user.id", index=True)
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
+    expires_at: datetime = Field(default_factory=utcnow)

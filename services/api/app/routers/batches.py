@@ -37,7 +37,7 @@ from ..notify import notify
 from ..security.audit import audit
 from ..security.auth import farmer_for, get_current_user, require_roles, warehouses_for
 from ..security.consent import require_consent
-from ..storage import batch_risk, close_storage_window, evaluate_warehouse, ghala_series
+from ..storage import batch_outlook, batch_risk, close_storage_window, evaluate_warehouse, ghala_series
 
 router = APIRouter(tags=["ghalani"])
 
@@ -330,6 +330,20 @@ def storage_risk(batch_id: str, user: User = Depends(get_current_user), session:
         "action": r.action,
         "stats": r.stats,
         "model_version": r.model_version,
+    }
+
+
+@router.get("/batches/{batch_id}/storage-outlook")
+def storage_outlook(batch_id: str, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    """Ghala temperature/humidity forecast and quick actions (same logic as the USSD Ghala menu)."""
+    o = batch_outlook(session, load_batch(session, batch_id, user))
+    return {
+        "batch_id": batch_id,
+        "now": {"temperature_c": o.temp_now, "humidity_pct": o.rh_now},
+        "forecast": {"hours_ahead": o.horizon_hours, "temperature_c": o.temp_pred, "humidity_pct": o.rh_pred},
+        "actions": o.actions,
+        "inputs": o.inputs,
+        "model_version": o.model_version,
     }
 
 
