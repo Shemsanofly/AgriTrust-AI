@@ -36,6 +36,10 @@ export default defineConfig({
   ],
   server: {
     port: 5173,
+    // Listen on the LAN so phones on the same Wi-Fi can open scanned QR codes.
+    host: true,
+    // Public tunnel hosts, so QR codes pointing at PUBLIC_WEB_URL open on any phone.
+    allowedHosts: ['.ngrok-free.app', '.ngrok-free.dev', '.ngrok.app', '.ngrok.dev'],
     proxy: { '/api': { target: 'http://127.0.0.1:8000', rewrite: (p) => p.replace(/^\/api/, '') } },
   },
 })

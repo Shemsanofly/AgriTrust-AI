@@ -14,7 +14,7 @@ from ..ai import anomalies
 from ..chain.anchor import anchor
 from ..chain.hashing import new_salt, record_hash
 from ..chain.records import anchor_entity, verify_entity
-from ..config import get_settings
+from ..config import public_web_url
 from ..db import get_session
 from ..i18n import bi
 from ..models import (
@@ -25,6 +25,8 @@ from ..models import (
     Farmer,
     Harvest,
     Role,
+    Sensor,
+    SensorReading,
     StorageRecord,
     User,
     Warehouse,
@@ -35,7 +37,7 @@ from ..notify import notify
 from ..security.audit import audit
 from ..security.auth import farmer_for, get_current_user, require_roles, warehouses_for
 from ..security.consent import require_consent
-from ..storage import batch_outlook, batch_risk, close_storage_window, ghala_series
+from ..storage import batch_outlook, batch_risk, close_storage_window, evaluate_warehouse, ghala_series
 
 router = APIRouter(tags=["ghalani"])
 
@@ -45,6 +47,9 @@ class HarvestIn(BaseModel):
     harvest_date: date
     quantity_kg: float = Field(gt=0, le=1_000_000)
     notes: str = ""
+    warehouse_id: Optional[int] = None
+    grade: str = Field(default="A", pattern=r"^(A|B|C)$")
+    bay: str = ""
 
 
 class ListingIn(BaseModel):
@@ -112,7 +117,7 @@ def proofs_for(session: Session, entity_type: str, entity_id: str) -> list[dict]
 
 def batch_json(session: Session, batch: CropBatch, detail: bool = False) -> dict:
     data = batch.model_dump(mode="json", exclude={"salt"})
-    data["qr_url"] = f"{get_settings().public_web_url}/verify/{batch.id}"
+    data["qr_url"] = f"{public_web_url()}/verify/{batch.id}"
     wh = session.get(Warehouse, batch.warehouse_id) if batch.warehouse_id else None
     data["warehouse"] = {"id": wh.id, "public_id": wh.public_id, "name": wh.name, "region": wh.region} if wh else None
     receipt = session.exec(select(WarehouseReceipt).where(WarehouseReceipt.batch_id == batch.id)).first()
@@ -133,6 +138,101 @@ def batch_json(session: Session, batch: CropBatch, detail: bool = False) -> dict
             for r in session.exec(select(StorageRecord).where(StorageRecord.batch_id == batch.id).order_by(StorageRecord.window_end))  # type: ignore[arg-type]
         ]
     return data
+
+
+def seed_simulated_ghala_readings_if_missing(session: Session, warehouse: Warehouse) -> None:
+    """Demo ghala sensor bootstrap for farmer-led storage: enough readings for charts,
+    risk advice and alerts when no recent warehouse sensor data exists."""
+    now = utcnow()
+    if ghala_series(session, warehouse.id, now - timedelta(hours=6)):
+        return
+    sensor = session.exec(select(Sensor).where(Sensor.device_id == f"SIM-GHALA-{warehouse.id}")).first()
+    if not sensor:
+        sensor = Sensor(
+            device_id=f"SIM-GHALA-{warehouse.id}",
+            type="ghala",
+            warehouse_id=warehouse.id,
+            secret=f"sim-ghala-{warehouse.id}",
+            simulated=True,
+        )
+        session.add(sensor)
+        session.flush()
+    for i in range(7):
+        ts = now - timedelta(hours=6 - i)
+        seq = sensor.last_seq + i + 1
+        readings = {
+            "temperature_c": 28.0 + i * 0.35,
+            "humidity_pct": 72.0 + i * 1.4,
+        }
+        for metric, value in readings.items():
+            session.add(SensorReading(sensor_id=sensor.id, ts=ts, metric=metric, value=round(value, 1), seq=seq, quality_flag="OK"))
+    sensor.last_seq += 7
+    sensor.last_seen_at = now
+    session.add(sensor)
+    session.flush()
+
+
+def default_verified_warehouse(session: Session, region: str | None = None) -> Warehouse | None:
+    warehouses = list(session.exec(select(Warehouse).where(Warehouse.verified == True).order_by(Warehouse.id)))  # noqa: E712
+    if region:
+        match = next((w for w in warehouses if w.region.lower() == region.lower()), None)
+        if match:
+            return match
+    return warehouses[0] if warehouses else None
+
+
+def store_batch_in_warehouse(
+    session: Session,
+    batch: CropBatch,
+    warehouse: Warehouse,
+    quantity_kg: float,
+    grade: str,
+    bay: str,
+    seed_readings: bool = False,
+) -> WarehouseReceipt:
+    if not warehouse.verified:
+        raise HTTPException(status.HTTP_409_CONFLICT, "warehouse_not_verified")
+    if batch.status != "HARVESTED":
+        raise HTTPException(status.HTTP_409_CONFLICT, "batch_already_stored")
+    if seed_readings:
+        seed_simulated_ghala_readings_if_missing(session, warehouse)
+    series = ghala_series(session, warehouse.id, utcnow() - timedelta(hours=6))
+    receipt = WarehouseReceipt(
+        id=new_receipt_id(session),
+        batch_id=batch.id,
+        warehouse_id=warehouse.id,
+        owner_farmer_id=batch.farmer_id,
+        quantity_kg=quantity_kg,
+        grade=grade,
+        date_in=date.today(),
+        bay=bay,
+        initial_temp_c=series[-1][1] if series else None,
+        initial_rh_pct=series[-1][2] if series else None,
+        salt=new_salt(),
+    )
+    session.add(receipt)
+    batch.status = "IN_STORAGE"
+    batch.warehouse_id = warehouse.id
+    batch.grade = grade
+    batch.available_kg = quantity_kg
+    session.add(batch)
+    anchor_entity(session, "RECEIPT", receipt)
+    anomalies.check_receipt_quantity(session, receipt, batch)
+    close_storage_window(session, batch)
+    farmer = session.get(Farmer, batch.farmer_id)
+    farmer_user = session.get(User, farmer.user_id) if farmer else None
+    if farmer_user:
+        notify(
+            session,
+            farmer_user,
+            "RECEIPT",
+            bi("alert.receipt_issued", receipt=receipt.id, batch=batch.id, qty=receipt.quantity_kg, grade=receipt.grade),
+            entity_type="RECEIPT",
+            entity_id=receipt.id,
+            sms=True,
+        )
+    evaluate_warehouse(session, warehouse)
+    return receipt
 
 
 # ---------------------------------------------------------------- harvest / batches
@@ -163,6 +263,22 @@ def record_harvest(body: HarvestIn, user: User = Depends(require_roles(Role.FARM
     session.add(crop)
     anchor_entity(session, "BATCH", batch)
     anomalies.check_duplicate_batch(session, batch)
+    if body.warehouse_id is not None:
+        warehouse = session.get(Warehouse, body.warehouse_id)
+        if not warehouse:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")
+    else:
+        warehouse = default_verified_warehouse(session, farm.region)
+    if warehouse:
+        store_batch_in_warehouse(
+            session,
+            batch,
+            warehouse,
+            body.quantity_kg,
+            body.grade,
+            body.bay or "Auto",
+            seed_readings=True,
+        )
     session.commit()
     return batch_json(session, batch, detail=True)
 
@@ -260,7 +376,7 @@ def anchor_storage_window(
 @router.get("/qr/{record_id}.svg")
 def qr_svg(record_id: str):
     """QR code pointing to the public verify page (printable on bags and receipts)."""
-    img = qrcode.make(f"{get_settings().public_web_url}/verify/{record_id}", image_factory=SvgPathImage, box_size=10, border=2)
+    img = qrcode.make(f"{public_web_url()}/verify/{record_id}", image_factory=SvgPathImage, box_size=10, border=2)
     buf = io.BytesIO()
     img.save(buf)
     return Response(buf.getvalue(), media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400"})
@@ -334,48 +450,10 @@ def intake(
     session: Session = Depends(get_session),
 ):
     wh = own_warehouse(session, user, warehouse_id)
-    if not wh.verified:
-        raise HTTPException(status.HTTP_409_CONFLICT, "warehouse_not_verified")
     batch = session.get(CropBatch, body.batch_id)
     if not batch:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")
-    if batch.status != "HARVESTED":
-        raise HTTPException(status.HTTP_409_CONFLICT, "batch_already_stored")
-    series = ghala_series(session, wh.id, utcnow() - timedelta(hours=6))
-    receipt = WarehouseReceipt(
-        id=new_receipt_id(session),
-        batch_id=batch.id,
-        warehouse_id=wh.id,
-        owner_farmer_id=batch.farmer_id,
-        quantity_kg=body.quantity_kg,
-        grade=body.grade,
-        date_in=date.today(),
-        bay=body.bay,
-        initial_temp_c=series[-1][1] if series else None,
-        initial_rh_pct=series[-1][2] if series else None,
-        salt=new_salt(),
-    )
-    session.add(receipt)
-    batch.status = "IN_STORAGE"
-    batch.warehouse_id = wh.id
-    batch.grade = body.grade
-    # Weighed at intake: this is the quantity that can be sold.
-    batch.available_kg = body.quantity_kg
-    session.add(batch)
-    anchor_entity(session, "RECEIPT", receipt)
-    anomalies.check_receipt_quantity(session, receipt, batch)
-    farmer = session.get(Farmer, batch.farmer_id)
-    farmer_user = session.get(User, farmer.user_id) if farmer else None
-    if farmer_user:
-        notify(
-            session,
-            farmer_user,
-            "RECEIPT",
-            bi("alert.receipt_issued", receipt=receipt.id, batch=batch.id, qty=receipt.quantity_kg, grade=receipt.grade),
-            entity_type="RECEIPT",
-            entity_id=receipt.id,
-            sms=True,
-        )
+    receipt = store_batch_in_warehouse(session, batch, wh, body.quantity_kg, body.grade, body.bay)
     session.commit()
     return receipt_json(session, receipt)
 
@@ -387,7 +465,7 @@ def receipt_json(session: Session, r: WarehouseReceipt) -> dict:
         **r.model_dump(mode="json", exclude={"salt"}),
         "warehouse": {"public_id": wh.public_id, "name": wh.name, "region": wh.region} if wh else None,
         "owner": {"public_id": farmer.public_id, "display_name": farmer.display_name} if farmer else None,
-        "qr_url": f"{get_settings().public_web_url}/verify/{r.id}",
+        "qr_url": f"{public_web_url()}/verify/{r.id}",
         "legal_notice": {
             "en": "Platform record only. Not a legal warehouse receipt under the regulated warehouse receipt system.",
             "sw": "Ni kumbukumbu ya jukwaa tu. Si stakabadhi rasmi ya ghala chini ya mfumo unaodhibitiwa wa stakabadhi za ghala.",

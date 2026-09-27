@@ -343,6 +343,7 @@
     "idealRange": "Bora {{min}}–{{max}}%",
     "idealBand": "Kiwango bora cha unyevu",
     "noReadings": "Bado hakuna vipimo.",
+    "aiEstimate": "Makadirio ya AI",
     "noSensor": "Shamba hili halina kihisi",
     "noSensorBody": "Ushauri unatumia utabiri wa hali ya hewa pekee hadi kihisi cha udongo kiwekwe.",
     "lastSeen": "kimesasishwa {{time}}",
@@ -367,7 +368,20 @@
     "useGps": "Tumia mahali nilipo",
     "gpsFailed": "Imeshindwa kupata mahali ulipo. Andika au jaribu ukiwa nje.",
     "soilType": "Aina ya udongo",
-    "irrigationType": "Chanzo cha maji"
+    "irrigationType": "Chanzo cha maji",
+    "predictSetup": "Tabiri kwa eneo",
+    "refreshPrediction": "Sasisha utabiri",
+    "predictSetupHint": "AI inapendekeza udongo, zao, chanzo cha maji, pH, unyevu na joto la udongo kutoka GPS/eneo. Bado unaweza kubadilisha sehemu hizi.",
+    "predictionApplied": "Mapendekezo ya AI yamewekwa.",
+    "predictionTitle": "Pendekezo la AI la kusajili shamba",
+    "predictionConfidence": "Uhakika",
+    "aiSuggested": "Imependekezwa na AI",
+    "predictionOverride": "Kagua pendekezo kabla ya kuhifadhi. Uzoefu wa eneo au kipimo cha udongo vinaweza kulibadilisha.",
+    "confidence": {
+      "low": "Mdogo",
+      "medium": "Wa kati",
+      "high": "Mkubwa"
+    }
   },
   "ghala": {
     "farmerTitle": "Ghala",
@@ -386,6 +400,9 @@
     "proofRecorded": "Rekodi ya mavuno imelindwa",
     "nextTakeToGhala": "Kinachofuata: lipeleke kwenye ghala lililothibitishwa",
     "nextTakeToGhalaBody": "Msimamizi atapima, atatoa daraja na stakabadhi ya kidijitali. Kisha unaweza kuuza sokoni.",
+    "destinationGhala": "Ghala la kupeleka",
+    "storedAfterHarvestTitle": "Limehifadhiwa ghalani",
+    "storedAfterHarvestBody": "Stakabadhi ya kidijitali imetolewa. QR sasa inafungua rekodi ya kundi, hali ya ghala na mapendekezo.",
     "printLabel": "Chapisha lebo ya QR",
     "openBatch": "Fungua kundi",
     "noReadyCrop": "Hakuna zao lililo tayari kuvunwa",
@@ -614,13 +631,51 @@
   },
   "finance": {
     "title": "Fedha",
-    "subtitle": "Rekodi yako ya kilimo iliyothibitishwa, na mikopo, bima na akiba inazoweza kukupatia.",
+    "subtitle": "Fedha zako kwa ufupi: hali yako, mikopo, akiba na bima.",
     "tabs": {
-      "profile": "Wasifu wangu",
+      "status": "Hali ya kifedha",
       "loans": "Mikopo",
-      "insurance": "Bima",
       "savings": "Akiba",
-      "sharing": "Kushiriki data"
+      "insurance": "Bima"
+    },
+    "status": {
+      "health": "Hali ya kifedha",
+      "band": {
+        "good": "Nzuri",
+        "fair": "Wastani",
+        "weak": "Inahitaji kuboreshwa"
+      },
+      "meaning": {
+        "good": "Rekodi zako zilizothibitishwa ni imara. Wakopeshaji na bima wana uwezekano wa kuziamini.",
+        "fair": "Uko njia sahihi. Mauzo au stakabadhi chache zaidi zilizothibitishwa zitasaidia.",
+        "weak": "Jenga rekodi yako kwanza: hifadhi mavuno ghalani na uuze kupitia jukwaa."
+      },
+      "nextIncome": "Mapato yanayotarajiwa: {{low}} – {{high}} karibu {{month}}",
+      "earned": "Mapato ya mauzo",
+      "earnedSub_one": "Mauzo {{count}} yaliyothibitishwa",
+      "earnedSub_other": "Mauzo {{count}} yaliyothibitishwa",
+      "noLoan": "Hakuna mkopo",
+      "loanActive_one": "Mkopo {{count}} unaoendelea",
+      "loanActive_other": "Mikopo {{count}} inayoendelea",
+      "loanPending_one": "Ombi {{count}} linasubiri",
+      "loanPending_other": "Maombi {{count}} yanasubiri",
+      "loanOffer": "Unaweza kuomba hadi {{amount}}",
+      "goals_one": "Katika lengo {{count}} la akiba",
+      "goals_other": "Katika malengo {{count}} ya akiba",
+      "notCovered": "Hujakingwa",
+      "policies_one": "Umekingwa na bima {{count}}",
+      "policies_other": "Umekingwa na bima {{count}}",
+      "policyRequested_one": "Ombi {{count}} linasubiri",
+      "policyRequested_other": "Maombi {{count}} yanasubiri",
+      "getCover": "Linda mazao yako na mzigo ghalani",
+      "openLoans": "Angalia mikopo",
+      "openSavings": "Angalia akiba",
+      "openInsurance": "Angalia bima",
+      "helping": "Kinachokusaidia",
+      "improve": "Cha kuboresha",
+      "fullRecord": "Ona rekodi yangu kamili",
+      "sharing": "Wewe ndiye unaamua mkopeshaji au bima gani anaona rekodi zako.",
+      "manage": "Simamia kushiriki"
     }
   },
   "profile": {

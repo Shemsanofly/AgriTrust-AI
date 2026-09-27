@@ -21,3 +21,6 @@ contracts/lib/
 .idea/
 .vscode/
 iot/firmware/**/secrets.h
+*.db.bak*
+*.log
+*.tsbuildinfo

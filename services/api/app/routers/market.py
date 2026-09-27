@@ -9,7 +9,7 @@ from sqlmodel import Session, select
 from ..ai.profile import build_profile
 from ..chain.hashing import new_salt
 from ..chain.records import anchor_entity, verify_entity
-from ..config import get_settings
+from ..config import get_settings, public_web_url
 from ..db import get_session
 from ..i18n import bi
 from ..integrations.payments_mock import simulate_payment
@@ -94,7 +94,7 @@ def listing_json(session: Session, batch: CropBatch, detail: bool = False) -> di
         "days_in_storage": (date.today() - receipt.date_in).days if receipt else None,
         "risk": {"level": risk.level, "headline": risk.headline, "drivers": risk.drivers, "stats": risk.stats},
         "verification_status": verification["status"],
-        "qr_url": f"{get_settings().public_web_url}/verify/{batch.id}",
+        "qr_url": f"{public_web_url()}/verify/{batch.id}",
     }
     if detail:
         data["verification"] = verification

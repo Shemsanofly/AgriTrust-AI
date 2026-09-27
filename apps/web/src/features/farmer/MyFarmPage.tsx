@@ -1,4 +1,4 @@
-import { Check, CloudRain, LocateFixed, Plus, Radio, Sun, CloudSun } from 'lucide-react'
+import { Check, CloudRain, LocateFixed, Plus, Radio, Sparkles, Sun, CloudSun } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChartLegend, CHART, TimeSeriesChart, pivotReadings } from '../../components/Charts'
@@ -24,7 +24,6 @@ import {
 } from '../../components/ui'
 import { api } from '../../lib/api'
 import { useApi, useBi, useErrorText, useFormat, type Bi } from '../../lib/hooks'
-import { IrrigationCard } from './IrrigationCard'
 import { MOISTURE_IDEAL, STAGES, seasonProgress, type Farm, type Weather } from './shared'
 
 type PlantingAdvice = {
@@ -42,6 +41,22 @@ type PlantingAdvice = {
     organic_matter_pct: number | null
     source: string | null
   }
+  model_version: string
+}
+
+type FarmSetupPrediction = {
+  soil_type: string
+  crop_type: string
+  irrigation_type: string
+  soil_moisture_pct: number
+  soil_temperature_c: number
+  soil_ph: number
+  soil_nitrogen: 'low' | 'medium' | 'high'
+  soil_phosphorus: 'low' | 'medium' | 'high'
+  soil_potassium: 'low' | 'medium' | 'high'
+  confidence: 'low' | 'medium' | 'high'
+  reasons: Bi[]
+  source: string
   model_version: string
 }
 
@@ -105,19 +120,17 @@ function FarmView({ farm, onChanged }: { farm: Farm; onChanged: () => void }) {
   const { t } = useTranslation()
   const f = useFormat()
   const soilSensor = farm.sensors.find((s) => s.type === 'soil')
-  const growing = farm.crops.find((c) => c.growth_stage !== 'harvested')
   const { data: planting, error: plantingError } = useApi<PlantingAdvice>(`/farms/${farm.id}/planting-advice`)
   const { data: readings } = useApi<{ ts: string; metric: string; value: number }[]>(soilSensor ? `/farms/${farm.id}/readings?hours=48` : null)
   const { data: weather } = useApi<Weather>(`/farms/${farm.id}/weather`)
   const errorText = useErrorText()
   const pivoted = readings?.length ? pivotReadings(readings) : null
+  const chartRows = pivoted ? displayReadings(pivoted, Boolean(soilSensor?.simulated)) : null
 
   return (
     <div className="space-y-5">
       <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
         <div className="space-y-5">
-          {growing && soilSensor && <IrrigationCard farmId={farm.id} showDemo={false} />}
-
           <Card
             title={t('farm.readings48h')}
             subtitle={soilSensor ? `${soilSensor.device_id} · ${soilSensor.last_seen_at ? t('farm.lastSeen', { time: f.relative(soilSensor.last_seen_at) }) : t('farm.neverSeen')}` : undefined}
@@ -125,7 +138,7 @@ function FarmView({ farm, onChanged }: { farm: Farm; onChanged: () => void }) {
           >
             {!soilSensor ? (
               <EmptyState compact icon={Radio} title={t('farm.noSensor')} body={t('farm.noSensorBody')} />
-            ) : !pivoted ? (
+            ) : !chartRows ? (
               <Skeleton className="h-48" />
             ) : (
               <div className="space-y-4">
@@ -134,13 +147,13 @@ function FarmView({ farm, onChanged }: { farm: Farm; onChanged: () => void }) {
                     <span className="font-medium">{t('farm.soilMoisture')}</span>
                     <span className="text-xs text-muted">{t('farm.idealRange', { min: MOISTURE_IDEAL.min, max: MOISTURE_IDEAL.max })}</span>
                   </div>
-                  <TimeSeriesChart height={170} data={pivoted} band={{ from: MOISTURE_IDEAL.min, to: MOISTURE_IDEAL.max }} series={[{ key: 'soil_moisture_pct', label: t('farm.soilMoisture'), unit: '%', color: CHART.moisture }]} />
+                  <TimeSeriesChart height={170} data={chartRows} band={{ from: MOISTURE_IDEAL.min, to: MOISTURE_IDEAL.max }} series={[{ key: 'soil_moisture_pct', label: t('farm.soilMoisture'), unit: '%', color: CHART.moisture }]} />
                 </div>
                 <div>
                   <div className="mb-1 text-sm font-medium">{t('farm.soilTemp')}</div>
-                  <TimeSeriesChart height={130} data={pivoted} series={[{ key: 'soil_temperature_c', label: t('farm.soilTemp'), unit: '°C', color: CHART.temperature }]} />
+                  <TimeSeriesChart height={130} data={chartRows} series={[{ key: 'soil_temperature_c', label: t('farm.soilTemp'), unit: '°C', color: CHART.temperature }]} />
                 </div>
-                <ChartLegend items={[{ label: t('farm.idealBand'), color: CHART.band }]} />
+                <ChartLegend items={[{ label: t('farm.idealBand'), color: CHART.band }, ...(soilSensor.simulated ? [{ label: t('farm.aiEstimate'), color: CHART.axis, dashed: true }] : [])]} />
               </div>
             )}
           </Card>
@@ -177,6 +190,17 @@ function FarmView({ farm, onChanged }: { farm: Farm; onChanged: () => void }) {
       </Card>
     </div>
   )
+}
+
+function displayReadings(rows: Record<string, any>[], estimated: boolean) {
+  if (!estimated || rows.length !== 1) return rows
+  const base = rows[0]
+  const t = new Date(base.ts).getTime()
+  if (!Number.isFinite(t)) return rows
+  return [-30, 0, 30].map((minutes) => ({
+    ...base,
+    ts: new Date(t + minutes * 60_000).toISOString(),
+  }))
 }
 
 function SoilCard({ farm, planting }: { farm: Farm; planting: PlantingAdvice | null }) {
@@ -410,6 +434,7 @@ function PlantingAdviceBody({ planting }: { planting: PlantingAdvice }) {
 
 function AddFarmDialog({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
   const { t } = useTranslation()
+  const bi = useBi()
   const toast = useToast()
   const errorText = useErrorText()
   const blank = {
@@ -430,6 +455,8 @@ function AddFarmDialog({ open, onClose, onDone }: { open: boolean; onClose: () =
   }
   const [form, setForm] = useState(blank)
   const [busy, setBusy] = useState(false)
+  const [predicting, setPredicting] = useState(false)
+  const [prediction, setPrediction] = useState<FarmSetupPrediction | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [touched, setTouched] = useState(false)
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value })
@@ -445,9 +472,49 @@ function AddFarmDialog({ open, onClose, onDone }: { open: boolean; onClose: () =
 
   const useGps = () =>
     navigator.geolocation?.getCurrentPosition(
-      (pos) => setForm((f) => ({ ...f, lat: pos.coords.latitude.toFixed(5), lon: pos.coords.longitude.toFixed(5) })),
+      (pos) => {
+        const lat = pos.coords.latitude.toFixed(5)
+        const lon = pos.coords.longitude.toFixed(5)
+        setForm((f) => ({ ...f, lat, lon }))
+        void predictSetup(lat, lon, form.region)
+      },
       () => setError(t('farm.gpsFailed')),
     )
+
+  const applyPrediction = (next: FarmSetupPrediction) => {
+    setForm((f) => ({
+      ...f,
+      soil_type: next.soil_type,
+      irrigation_type: next.irrigation_type,
+      crop_type: next.crop_type,
+      soil_ph: String(next.soil_ph),
+      soil_nitrogen: next.soil_nitrogen,
+      soil_phosphorus: next.soil_phosphorus,
+      soil_potassium: next.soil_potassium,
+    }))
+  }
+
+  const predictSetup = async (latValue = form.lat, lonValue = form.lon, regionValue = form.region) => {
+    const lat = num(latValue)
+    const lon = num(lonValue)
+    if (!(Number.isFinite(lat) && Number.isFinite(lon) && lat !== null && lon !== null)) {
+      setTouched(true)
+      setError(t('validation.location'))
+      return
+    }
+    setPredicting(true)
+    setError(null)
+    try {
+      const next = await api<FarmSetupPrediction>('/farms/predict-setup', { method: 'POST', body: { lat, lon, region: regionValue.trim() || null } })
+      setPrediction(next)
+      applyPrediction(next)
+      toast(t('farm.predictionApplied'))
+    } catch (err) {
+      setError(errorText(err))
+    } finally {
+      setPredicting(false)
+    }
+  }
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -456,7 +523,11 @@ function AddFarmDialog({ open, onClose, onDone }: { open: boolean; onClose: () =
     setBusy(true)
     setError(null)
     try {
-      const hasTest = form.soil_ph || form.soil_nitrogen || form.soil_phosphorus || form.soil_potassium
+      const predictedPhUnchanged = prediction && num(form.soil_ph) === prediction.soil_ph
+      const manualNitrogen = form.soil_nitrogen && (!prediction || form.soil_nitrogen !== prediction.soil_nitrogen)
+      const manualPhosphorus = form.soil_phosphorus && (!prediction || form.soil_phosphorus !== prediction.soil_phosphorus)
+      const manualPotassium = form.soil_potassium && (!prediction || form.soil_potassium !== prediction.soil_potassium)
+      const hasManualTest = (form.soil_ph && !predictedPhUnchanged) || manualNitrogen || manualPhosphorus || manualPotassium
       await api('/farms', {
         method: 'POST',
         body: {
@@ -471,11 +542,13 @@ function AddFarmDialog({ open, onClose, onDone }: { open: boolean; onClose: () =
           soil_nitrogen: form.soil_nitrogen || null,
           soil_phosphorus: form.soil_phosphorus || null,
           soil_potassium: form.soil_potassium || null,
-          soil_source: hasTest ? 'farmer' : null,
+          soil_source: hasManualTest ? 'farmer' : prediction ? 'soil_map' : null,
+          ai_estimated_environment: Boolean(prediction),
           crop: { crop_type: form.crop_type, planting_date: form.planting_date, expected_harvest_date: form.expected_harvest_date || null, growth_stage: 'initial' },
         },
       })
       setForm(blank)
+      setPrediction(null)
       setTouched(false)
       toast(t('farm.added'))
       onDone()
@@ -534,6 +607,71 @@ function AddFarmDialog({ open, onClose, onDone }: { open: boolean; onClose: () =
         <Field label={`${t('farm.acreage')} (${t('farm.acres')})`} error={show('acreage')}>
           <input className="input" value={form.acreage} onChange={set('acreage')} inputMode="decimal" aria-invalid={Boolean(show('acreage'))} />
         </Field>
+        <div className="sm:col-span-2">
+          <Button variant="gold" icon={Sparkles} busy={predicting} onClick={() => predictSetup()} disabled={busy}>
+            {prediction ? t('farm.refreshPrediction') : t('farm.predictSetup')}
+          </Button>
+          <p className="mt-1 text-xs text-muted">{t('farm.predictSetupHint')}</p>
+        </div>
+        {prediction && (
+          <div className="rounded-md border border-harvest-500/40 bg-harvest-100/40 p-3 sm:col-span-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="text-sm font-semibold text-ink">{t('farm.predictionTitle')}</div>
+                <div className="text-xs text-muted">
+                  {t('farm.predictionConfidence')}: {t(`farm.confidence.${prediction.confidence}`)} / {prediction.model_version}
+                </div>
+              </div>
+              <Badge tone={prediction.confidence === 'high' ? 'green' : prediction.confidence === 'medium' ? 'gold' : 'amber'} icon={Sparkles}>
+                {t('farm.aiSuggested')}
+              </Badge>
+            </div>
+            <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
+              <div>
+                <span className="text-muted">{t('farm.soilType')}</span>
+                <div className="font-medium">{t(`soil.${prediction.soil_type}`, { defaultValue: prediction.soil_type })}</div>
+              </div>
+              <div>
+                <span className="text-muted">{t('farm.irrigationType')}</span>
+                <div className="font-medium">{t(`irrigation.${prediction.irrigation_type}`, { defaultValue: prediction.irrigation_type })}</div>
+              </div>
+              <div>
+                <span className="text-muted">{t('farm.crop')}</span>
+                <div className="font-medium">{t(`crops.${prediction.crop_type}`, { defaultValue: prediction.crop_type })}</div>
+              </div>
+              <div>
+                <span className="text-muted">{t('farm.soilMoisture')}</span>
+                <div className="font-medium">{prediction.soil_moisture_pct}%</div>
+              </div>
+              <div>
+                <span className="text-muted">{t('farm.soilTemp')}</span>
+                <div className="font-medium">{prediction.soil_temperature_c}°C</div>
+              </div>
+              <div>
+                <span className="text-muted">{t('farm.soilPh')}</span>
+                <div className="font-medium">{prediction.soil_ph}</div>
+              </div>
+              <div>
+                <span className="text-muted">{t('nutrients.N')}</span>
+                <div className="font-medium">{t(`levels.${prediction.soil_nitrogen}`)}</div>
+              </div>
+              <div>
+                <span className="text-muted">{t('nutrients.P')}</span>
+                <div className="font-medium">{t(`levels.${prediction.soil_phosphorus}`)}</div>
+              </div>
+              <div>
+                <span className="text-muted">{t('nutrients.K')}</span>
+                <div className="font-medium">{t(`levels.${prediction.soil_potassium}`)}</div>
+              </div>
+            </div>
+            <ul className="mt-3 space-y-1 text-xs text-ink-soft">
+              {prediction.reasons.map((reason, i) => (
+                <li key={i}>{bi(reason)}</li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs text-muted">{t('farm.predictionOverride')}</p>
+          </div>
+        )}
         <Field label={t('farm.soilType')}>
           <select className="input" value={form.soil_type} onChange={set('soil_type')}>
             {['loam', 'sandy loam', 'clay', 'sandy'].map((s) => (

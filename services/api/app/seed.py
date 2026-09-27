@@ -105,30 +105,26 @@ def seed() -> None:
         s.flush()
 
         today = date.today()
-        upper = Farm(
-            farmer_id=neema.id, name="Shamba la Juu", region="Dodoma", lat=-6.17, lon=35.75, acreage=3,
+        farm = Farm(
+            farmer_id=neema.id, name="Shamba", region="Dodoma", lat=-6.17, lon=35.75, acreage=5,
             soil_type="sandy loam", irrigation_type="drip",
             soil_ph=6.2, soil_nitrogen="medium", soil_phosphorus="low", soil_potassium="medium",
             organic_matter_pct=1.6, soil_source="lab",
         )
-        lower = Farm(
-            farmer_id=neema.id, name="Shamba la Chini", region="Dodoma", lat=-6.18, lon=35.76, acreage=2,
-            soil_type="loam", irrigation_type="furrow", soil_ph=6.6, soil_source="soil_map",
-        )
-        s.add_all([upper, lower])
+        s.add(farm)
         s.flush()
         growing = Crop(
-            farm_id=upper.id, crop_type="maize", variety="SC 403", acreage=3, planting_date=today - timedelta(days=40),
+            farm_id=farm.id, crop_type="maize", variety="SC 403", acreage=3, planting_date=today - timedelta(days=40),
             expected_harvest_date=today + timedelta(days=160), growth_stage="vegetative",
         )
         ready = Crop(
-            farm_id=lower.id, crop_type="maize", variety="Staha", acreage=2, planting_date=today - timedelta(days=115),
+            farm_id=farm.id, crop_type="maize", variety="Staha", acreage=2, planting_date=today - timedelta(days=115),
             expected_harvest_date=today, growth_stage="maturity",
         )
         s.add_all([growing, ready])
         s.flush()
 
-        soil = Sensor(device_id="ESP32-SOIL-01", type="soil", farm_id=upper.id, secret="dev-soil-secret", simulated=True)
+        soil = Sensor(device_id="ESP32-SOIL-01", type="soil", farm_id=farm.id, secret="dev-soil-secret", simulated=True)
         ghala = Sensor(device_id="ESP32-GHALA-01", type="ghala", warehouse_id=wh.id, secret="dev-ghala-secret", simulated=True)
         s.add_all([soil, ghala])
         s.flush()
@@ -139,7 +135,7 @@ def seed() -> None:
         for i in range(20):
             s.add(
                 IrrigationAdvice(
-                    farm_id=upper.id, crop_id=growing.id, created_at=utcnow() - timedelta(days=40 - 2 * i),
+                    farm_id=farm.id, crop_id=growing.id, created_at=utcnow() - timedelta(days=40 - 2 * i),
                     action="IRRIGATE" if i % 3 else "SKIP_RAIN", amount_mm=15 if i % 3 else 0,
                     when={"en": "tomorrow morning", "sw": "kesho asubuhi"},
                     headline={"en": "Seeded history", "sw": "Historia ya mfano"},
@@ -149,7 +145,7 @@ def seed() -> None:
 
         # Earlier harvest this year: stored, receipted and sold to two buyers.
         early_crop = Crop(
-            farm_id=lower.id, crop_type="maize", variety="Staha", planting_date=today - timedelta(days=300),
+            farm_id=farm.id, crop_type="maize", variety="Staha", planting_date=today - timedelta(days=300),
             expected_harvest_date=today - timedelta(days=180), growth_stage="harvested",
         )
         s.add(early_crop)

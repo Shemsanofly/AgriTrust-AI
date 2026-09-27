@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
-from ..ai import irrigation, planting
+from ..ai import farm_setup, irrigation, planting
 from ..ai.soil_map import salinity_band
 from ..db import get_session
 from ..integrations.open_meteo import get_forecast, get_soil_moisture
@@ -41,7 +41,31 @@ class FarmIn(BaseModel):
     organic_matter_pct: Optional[float] = Field(default=None, ge=0, le=20)
     soil_salinity_ec: Optional[float] = Field(default=None, ge=0, le=50)
     soil_source: Optional[str] = Field(default=None, pattern=r"^(lab|soil_map|farmer)$")
+    ai_estimated_environment: bool = False
     crop: Optional[CropIn] = None
+
+
+class FarmSetupPredictIn(BaseModel):
+    lat: float = Field(ge=-12.5, le=1.5)
+    lon: float = Field(ge=29.0, le=41.0)
+    region: Optional[str] = None
+
+
+class FarmSetupPredictOut(BaseModel):
+    soil_type: str
+    crop_type: str
+    irrigation_type: str
+    soil_moisture_pct: float
+    soil_temperature_c: float
+    soil_ph: float
+    soil_nitrogen: str
+    soil_phosphorus: str
+    soil_potassium: str
+    confidence: str
+    reasons: list[dict[str, str]]
+    source: str
+    inputs: dict
+    model_version: str
 
 
 class CropUpdate(BaseModel):
@@ -100,12 +124,45 @@ def farm_json(session: Session, farm: Farm) -> dict:
     }
 
 
+def seed_ai_soil_estimates(session: Session, farm: Farm) -> None:
+    suggestion = farm_setup.predict_setup(farm.lat, farm.lon, farm.region)
+    if farm.soil_ph is None:
+        farm.soil_ph = suggestion.soil_ph
+    if farm.soil_nitrogen is None:
+        farm.soil_nitrogen = suggestion.soil_nitrogen
+    if farm.soil_phosphorus is None:
+        farm.soil_phosphorus = suggestion.soil_phosphorus
+    if farm.soil_potassium is None:
+        farm.soil_potassium = suggestion.soil_potassium
+    session.add(farm)
+    now = utcnow()
+    sensor = Sensor(
+        device_id=f"AI-SOIL-{farm.id}",
+        type="soil",
+        farm_id=farm.id,
+        secret=f"ai-soil-estimate-{farm.id}",
+        simulated=True,
+        last_seen_at=now,
+        last_seq=0,
+        calibration={"source": suggestion.source, "model_version": suggestion.model_version},
+    )
+    session.add(sensor)
+    session.flush()
+    for metric, value in {
+        "soil_moisture_pct": suggestion.soil_moisture_pct,
+        "soil_temperature_c": suggestion.soil_temperature_c,
+    }.items():
+        session.add(SensorReading(sensor_id=sensor.id, ts=now, metric=metric, value=value, seq=0, quality_flag="ESTIMATE"))
+
+
 @router.post("/farms", status_code=201)
 def create_farm(body: FarmIn, user: User = Depends(require_roles(Role.FARMER)), session: Session = Depends(get_session)):
     farmer = farmer_for(session, user)
-    farm = Farm(farmer_id=farmer.id, **body.model_dump(exclude={"crop"}))
+    farm = Farm(farmer_id=farmer.id, **body.model_dump(exclude={"crop", "ai_estimated_environment"}))
     session.add(farm)
     session.flush()
+    if body.soil_source == "soil_map" or body.ai_estimated_environment:
+        seed_ai_soil_estimates(session, farm)
     if body.crop:
         session.add(Crop(farm_id=farm.id, **body.crop.model_dump()))
     session.commit()
@@ -116,6 +173,12 @@ def create_farm(body: FarmIn, user: User = Depends(require_roles(Role.FARMER)), 
 def list_farms(user: User = Depends(require_roles(Role.FARMER)), session: Session = Depends(get_session)):
     farmer = farmer_for(session, user)
     return [farm_json(session, f) for f in session.exec(select(Farm).where(Farm.farmer_id == farmer.id))]
+
+
+@router.post("/farms/predict-setup", response_model=FarmSetupPredictOut)
+def predict_farm_setup(body: FarmSetupPredictIn, _: User = Depends(require_roles(Role.FARMER))):
+    """Suggest farm setup defaults from location. Farmers can override every field."""
+    return farm_setup.predict_setup(body.lat, body.lon, body.region).__dict__
 
 
 @router.get("/farms/{farm_id}")

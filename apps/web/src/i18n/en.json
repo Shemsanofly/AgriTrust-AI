@@ -343,6 +343,7 @@
     "idealRange": "Ideal {{min}}–{{max}}%",
     "idealBand": "Ideal moisture range",
     "noReadings": "No readings yet.",
+    "aiEstimate": "AI estimate",
     "noSensor": "No sensor on this farm",
     "noSensorBody": "Advice uses the weather forecast only until a soil sensor is installed.",
     "lastSeen": "updated {{time}}",
@@ -367,7 +368,20 @@
     "useGps": "Use my location",
     "gpsFailed": "Couldn't get your location. Type it or try again outside.",
     "soilType": "Soil type",
-    "irrigationType": "Water source"
+    "irrigationType": "Water source",
+    "predictSetup": "Predict from location",
+    "refreshPrediction": "Refresh prediction",
+    "predictSetupHint": "AI suggests soil, crop, water source, pH, moisture and soil temperature from your GPS/location. You can still edit the fields.",
+    "predictionApplied": "AI farm setup applied.",
+    "predictionTitle": "AI farm setup suggestion",
+    "predictionConfidence": "Confidence",
+    "aiSuggested": "AI suggested",
+    "predictionOverride": "Review the suggestion before saving. Local knowledge or a soil test should override it.",
+    "confidence": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    }
   },
   "ghala": {
     "farmerTitle": "Ghala",
@@ -386,6 +400,9 @@
     "proofRecorded": "Harvest record secured",
     "nextTakeToGhala": "Next: take it to a verified ghala",
     "nextTakeToGhalaBody": "The operator weighs and grades it and issues a digital receipt. Then you can sell it in the marketplace.",
+    "destinationGhala": "Destination ghala",
+    "storedAfterHarvestTitle": "Stored in ghala",
+    "storedAfterHarvestBody": "A digital receipt has been issued. The QR code now opens the batch record, storage conditions and recommendations.",
     "printLabel": "Print QR label",
     "openBatch": "Open batch",
     "noReadyCrop": "No crop is ready to harvest",
@@ -614,13 +631,51 @@
   },
   "finance": {
     "title": "Finance",
-    "subtitle": "Your verified farming record, and the loans, insurance and savings it can support.",
+    "subtitle": "Your money at a glance: how you are doing, your loans, savings and insurance.",
     "tabs": {
-      "profile": "My profile",
+      "status": "Financial status",
       "loans": "Loans",
-      "insurance": "Insurance",
       "savings": "Savings",
-      "sharing": "Data sharing"
+      "insurance": "Insurance"
+    },
+    "status": {
+      "health": "Financial health",
+      "band": {
+        "good": "Good",
+        "fair": "Fair",
+        "weak": "Needs attention"
+      },
+      "meaning": {
+        "good": "Your verified records are strong. Lenders and insurers are likely to trust them.",
+        "fair": "You are on the right track. A few more verified sales or receipts will help.",
+        "weak": "Build your record first: store harvests in a ghala and sell through the platform."
+      },
+      "nextIncome": "Expected income: {{low}} – {{high}} around {{month}}",
+      "earned": "Earned from sales",
+      "earnedSub_one": "{{count}} verified sale",
+      "earnedSub_other": "{{count}} verified sales",
+      "noLoan": "No loan",
+      "loanActive_one": "{{count}} active loan",
+      "loanActive_other": "{{count}} active loans",
+      "loanPending_one": "{{count}} application waiting",
+      "loanPending_other": "{{count}} applications waiting",
+      "loanOffer": "You can apply for up to {{amount}}",
+      "goals_one": "In {{count}} savings goal",
+      "goals_other": "In {{count}} savings goals",
+      "notCovered": "Not covered",
+      "policies_one": "Covered by {{count}} policy",
+      "policies_other": "Covered by {{count}} policies",
+      "policyRequested_one": "{{count}} request waiting",
+      "policyRequested_other": "{{count}} requests waiting",
+      "getCover": "Protect your crop and ghala stock",
+      "openLoans": "See loans",
+      "openSavings": "See savings",
+      "openInsurance": "See insurance",
+      "helping": "What is helping you",
+      "improve": "What to improve",
+      "fullRecord": "See my full record",
+      "sharing": "You decide which lender or insurer can see your records.",
+      "manage": "Manage sharing"
     }
   },
   "profile": {
