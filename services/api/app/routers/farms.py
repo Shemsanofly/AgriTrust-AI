@@ -6,8 +6,9 @@ from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
 from ..ai import irrigation, planting
+from ..ai.soil_map import salinity_band
 from ..db import get_session
-from ..integrations.open_meteo import get_forecast
+from ..integrations.open_meteo import get_forecast, get_soil_moisture
 from ..models import Crop, Farm, Farmer, IrrigationAdvice, Role, Sensor, SensorReading, User, utcnow
 from ..security.audit import audit
 from ..security.auth import farmer_for, get_current_user, require_roles
@@ -19,6 +20,7 @@ EAT = timezone(timedelta(hours=3))  # Africa/Dar_es_Salaam
 class CropIn(BaseModel):
     crop_type: str = "maize"
     variety: Optional[str] = None
+    acreage: Optional[float] = Field(default=None, gt=0, le=10_000)
     planting_date: date
     expected_harvest_date: Optional[date] = None
     growth_stage: str = "vegetative"
@@ -37,6 +39,7 @@ class FarmIn(BaseModel):
     soil_phosphorus: Optional[str] = Field(default=None, pattern=r"^(low|medium|high)$")
     soil_potassium: Optional[str] = Field(default=None, pattern=r"^(low|medium|high)$")
     organic_matter_pct: Optional[float] = Field(default=None, ge=0, le=20)
+    soil_salinity_ec: Optional[float] = Field(default=None, ge=0, le=50)
     soil_source: Optional[str] = Field(default=None, pattern=r"^(lab|soil_map|farmer)$")
     crop: Optional[CropIn] = None
 
@@ -248,26 +251,66 @@ def irrigation_advice(farm_id: int, user: User = Depends(get_current_user), sess
     return advice_json(advice)
 
 
-@router.get("/farms/{farm_id}/planting-advice")
-def planting_advice(farm_id: int, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
-    """Recommend crops to plant based on the farm's registered soil type."""
-    farm = load_farm(session, farm_id, user)
-    current = session.exec(
+def soil_moisture_now(session: Session, farm: Farm) -> tuple[Optional[float], Optional[str]]:
+    """Fresh sensor reading if there is one, otherwise the location's live estimate (snapshotted on the farm)."""
+    ids = [s.id for s in session.exec(select(Sensor).where(Sensor.farm_id == farm.id))]
+    reading = _latest(session, ids, "soil_moisture_pct")
+    if reading and reading.quality_flag == "OK":
+        ts = reading.ts if reading.ts.tzinfo else reading.ts.replace(tzinfo=timezone.utc)
+        if (utcnow() - ts).total_seconds() / 3600 <= irrigation.STALE_HOURS:
+            return reading.value, "sensor"
+    pct, _simulated, source = get_soil_moisture(farm.lat, farm.lon)
+    farm.soil_moisture_pct = pct
+    farm.soil_moisture_source = source
+    farm.soil_checked_at = utcnow()
+    session.add(farm)
+    return pct, source
+
+
+def active_crop(session: Session, farm: Farm) -> Optional[Crop]:
+    return session.exec(
         select(Crop).where(Crop.farm_id == farm.id, Crop.growth_stage != "harvested").order_by(Crop.planting_date.desc())  # type: ignore[attr-defined]
     ).first()
-    result = planting.recommend(farm.soil_type, current.crop_type if current else None, farm.irrigation_type)
+
+
+def compute_planting(session: Session, farm: Farm) -> planting.PlantingAdvice:
+    """Crop suitability from soil type, pH, salinity and moisture, plus planting timing from the forecast."""
+    current = active_crop(session, farm)
+    moisture, _source = soil_moisture_now(session, farm)
+    forecast = get_forecast(farm.lat, farm.lon)
+    return planting.recommend(
+        farm.soil_type,
+        current.crop_type if current else None,
+        farm.irrigation_type,
+        ph=farm.soil_ph,
+        salinity_ec=farm.soil_salinity_ec,
+        moisture_pct=moisture,
+        rain_next_7d_mm=forecast.rain_next(7),
+    )
+
+
+@router.get("/farms/{farm_id}/planting-advice")
+def planting_advice(farm_id: int, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    """Recommend crops to plant from the farm's soil (type, pH, salinity, moisture) and the rain forecast."""
+    farm = load_farm(session, farm_id, user)
+    result = compute_planting(session, farm)
+    session.commit()
     return {
         "headline": result.headline,
         "soil_summary": result.soil_summary,
         "tips": result.tips,
         "recommendations": result.recommendations,
         "current_crop": result.current_crop,
+        "timing": result.timing,
         "soil_profile": {
             **planting.soil_profile_notes(
                 farm.soil_ph,
                 {"N": farm.soil_nitrogen, "P": farm.soil_phosphorus, "K": farm.soil_potassium},
             ),
             "organic_matter_pct": farm.organic_matter_pct,
+            "salinity_ec": farm.soil_salinity_ec,
+            "salinity_band": salinity_band(farm.soil_salinity_ec) if farm.soil_salinity_ec is not None else None,
+            "moisture_pct": result.inputs.get("moisture_pct"),
             "source": farm.soil_source,
         },
         "inputs": result.inputs,

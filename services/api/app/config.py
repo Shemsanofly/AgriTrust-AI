@@ -30,6 +30,21 @@ class Settings(BaseSettings):
 
     africastalking_username: str = "sandbox"
     africastalking_api_key: str = ""
+    africastalking_ussd_code: str = ""
+    africastalking_sender_id: str = ""
+
+    # USSD / SMS channel settings (provider adapters live under app.communication).
+    ussd_provider: str = "africastalking"  # africastalking | beem | console
+    sms_provider: str = "africastalking"  # africastalking | beem | console
+    ussd_enabled: bool = True
+    sms_enabled: bool = True
+    ussd_session_ttl_minutes: int = 5
+    public_base_url: str = ""  # e.g. https://xxxxx.ngrok-free.app — used in docs only
+
+    beem_api_key: str = ""
+    beem_secret_key: str = ""
+    beem_ussd_code: str = ""
+    beem_sender_id: str = ""
 
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     public_web_url: str = "http://localhost:5173"
